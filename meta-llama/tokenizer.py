@@ -67,11 +67,3 @@ class Tokenizer:
         """
         return self.sp_model.decode(t)
 
-
-def test_encode(model_path, content):
-    t = Tokenizer(model_path)
-    return t.encode(content, True, True)
-
-def test_decode(model_path, ids):
-    t = Tokenizer(model_path)
-    return t.decode(ids)

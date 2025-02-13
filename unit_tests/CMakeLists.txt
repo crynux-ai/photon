@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.12)
 
-file(GLOB SRCS "**/*.cc" "*.h")
+file(GLOB SRCS "**/*.cc" "**/*.h")
 add_executable(tests ${SRCS})
 
-
+# gtest
 include(FetchContent)
 FetchContent_Declare(
     googletest
@@ -11,8 +11,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-# Link tests with the layers library and GoogleTest
-target_link_libraries(tests PRIVATE layers gtest_main)
+target_link_libraries(
+    tests PRIVATE
+    layers
+    gtest_main
+)
 
 # Register the test with CTest
 add_test(

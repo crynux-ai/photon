@@ -1,16 +1,17 @@
 #include "tokenizer.h"
 
-#include <stdexcept>
-
 void Tokenizer::build(std::string_view path) {
-    const auto status = this->processor.Load(path);
-    if (!status.ok()) {
-        throw std::invalid_argument(status.ToString());
-    }
+    this->processor.LoadOrDie(path);
 }
 
-std::vector<int> Tokenizer::encode(std::string_view text) {
+std::vector<int> Tokenizer::encode(std::string_view text, bool bos, bool eos) {
     std::vector<int> ids;
+    if (bos) {
+        ids.insert(ids.begin(), this->processor.bos_id());
+    }
+    if (eos) {
+        ids.push_back(this->processor.eos_id());
+    }
     processor.Encode(text, &ids);
     return ids;
 }
