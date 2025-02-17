@@ -1,5 +1,8 @@
 from tokenizer import Tokenizer
+import model
 
+import torch
+import struct
 
 def encode(content: str) -> str:
     t = Tokenizer("models/tokenizer.model")
@@ -28,6 +31,31 @@ def gen_tokenizer_data():
             file.write(token[i])
             file.write("\n")
 
+def tensor_to_bytes(tensor):
+    data = struct.pack("i", len(tensor.shape))
+    content = [tensor.tolist()]
+    for x in tensor.shape:
+        data += struct.pack("i", x)
+        content = sum(content, [])
+    for x in content:
+        data += struct.pack("f", x)
+    return data
+
+
+def gen_feedforward_data():
+    layer = model.FeedForward(dim=256, hidden_dim=1024, multiple_of=4, ffn_dim_multiplier=None)
+    x = torch.randn(1, 256)
+    y = layer(x)
+    print(y.shape)
+    with open("unit_tests/testdata/feedforward.dat", "wb") as file:
+        file.write(struct.pack("i", 256) + struct.pack("i", 1024) + struct.pack("i", 4))
+        file.write(tensor_to_bytes(layer.w1.weight))
+        file.write(tensor_to_bytes(layer.w2.weight))
+        file.write(tensor_to_bytes(layer.w3.weight))
+        file.write(tensor_to_bytes(x))
+        file.write(tensor_to_bytes(y))
+
 
 if __name__ == '__main__':
     gen_tokenizer_data()
+    gen_feedforward_data()
