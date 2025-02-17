@@ -73,8 +73,3 @@ TEST(TokenizerTest, MatchPython) {
         EXPECT_EQ(texts[i], tokenizer.decode(tokens[i]));
     }
 }
-
-int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

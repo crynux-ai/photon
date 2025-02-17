@@ -16,8 +16,10 @@ public:
     Tensor(const std::vector<int>& shape) {
         _shape = shape;
         _cnt = 1;
-        for (int x : shape) {
-            _cnt *= x;
+        _base.resize(shape.size());
+        for (int i = shape.size() - 1; i >= 0; i--) {
+            _base[i] = _cnt;
+            _cnt *= shape[i];
         }
         _value = new float[_cnt];
     }
@@ -43,12 +45,17 @@ public:
         std::memcpy(&dim, ptr, 4);
         ptr += 4;
         _shape.resize(dim);
+        _base.resize(dim);
         
 
-        _cnt = 1;
         for (int i = 0; i < dim; i++) {
             std::memcpy(&_shape[i], ptr, 4);
             ptr += 4;
+        }
+
+        _cnt = 1;
+        for (int i = _shape.size() - 1; i >= 0; i--) {
+            _base[i] = _cnt;
             _cnt *= _shape[i];
         }
 
@@ -68,8 +75,43 @@ public:
         return true;
     }
 
+    template <typename... Args>
+    float operator()(Args... args) const {
+        if (sizeof...(args) != _shape.size()) {
+            throw std::invalid_argument("Invalid access to tensor");
+        }
+        int index = 0;
+        int ptr = 0;
+        ((index += _base[ptr++] * args), ...);  
+        return _value[index];
+    }
+
+    template <typename... Args>
+    void set(float val, Args... args) {
+        if (sizeof...(args) != _shape.size()) {
+            throw std::invalid_argument("Invalid access to tensor");
+        }
+        int index = 0;
+        int ptr = 0;
+        ((index += _base[ptr++] * args), ...);  
+        _value[index] = val;
+    }
+
+    template <typename... Args>
+    void add(float val, Args... args) {
+        if (sizeof...(args) != _shape.size()) {
+            throw std::invalid_argument("Invalid access to tensor");
+        }
+        int index = 0;
+        int ptr = 0;
+        ((index += _base[ptr++] * args), ...);  
+        _value[index] += val;
+    }
+
+
 protected:
     std::vector<int> _shape;
+    std::vector<int> _base;
     int _cnt;
     float* _value;
     
