@@ -55,7 +55,34 @@ def gen_feedforward_data():
         file.write(tensor_to_bytes(x))
         file.write(tensor_to_bytes(y))
 
+def gen_attention_data():
+    layer = model.FeedForward(dim=256, hidden_dim=1024, multiple_of=4, ffn_dim_multiplier=None)
+    x = torch.randn(1, 256)
+    y = layer(x)
+    print(y.shape)
+    with open("unit_tests/testdata/feedforward.dat", "wb") as file:
+        file.write(struct.pack("i", 256) + struct.pack("i", 1024) + struct.pack("i", 4))
+        file.write(tensor_to_bytes(layer.w1.weight))
+        file.write(tensor_to_bytes(layer.w2.weight))
+        file.write(tensor_to_bytes(layer.w3.weight))
+        file.write(tensor_to_bytes(x))
+        file.write(tensor_to_bytes(y))
+
+def gen_rope_data():
+    freqs_ics = model.precompute_freqs_cis(32, 77, 10000.0)
+    xq = torch.randn(3, 77, 4, 32)
+    xk = torch.randn(3, 77, 4, 32)
+    pq, pk = model.apply_rotary_emb(xq, xk, freqs_ics)
+
+    with open("unit_tests/testdata/rope.dat", "wb") as file:
+        file.write(struct.pack("i", 3) + struct.pack("i", 77) + struct.pack("i", 4) + struct.pack("i", 32))
+        file.write(tensor_to_bytes(xq.view(3, 77, 128)))
+        file.write(tensor_to_bytes(xk.view(3, 77, 128)))
+        file.write(tensor_to_bytes(pq.view(3, 77, 128)))
+        file.write(tensor_to_bytes(pk.view(3, 77, 128)))
+
 
 if __name__ == '__main__':
-    gen_tokenizer_data()
-    gen_feedforward_data()
+    # gen_tokenizer_data()
+    # gen_feedforward_data()
+    gen_rope_data()

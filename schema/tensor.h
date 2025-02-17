@@ -4,6 +4,7 @@
 
 #include <string_view>
 #include <vector>
+#include <iostream>
 
 class Tensor {
 
@@ -63,16 +64,24 @@ public:
         std::memcpy(_value, ptr, 4 * _cnt);
     }
 
-    bool eq(const Tensor& other) {
+    bool eq(const Tensor& other, bool check_all=false) {
         if (_shape != other.shape()) {
             return false;
         }
+        int cnt = _cnt;
         for (int i = 0; i < _cnt; i++) {
             if (std::fabs(_value[i] - other._value[i]) > 1e-5) {
-                return false;
+                if (check_all) {
+                    cnt--;
+                } else {
+                    return false;
+                }
             }
         }
-        return true;
+        if (cnt < _cnt) {
+            std::cerr << cnt << " / " << _cnt << " matches" << std::endl;
+        }
+        return cnt == _cnt;
     }
 
     template <typename... Args>
