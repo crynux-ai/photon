@@ -28,31 +28,38 @@ std::pair<FreqMatrix, FreqMatrix> precompute_freqs_cis(int head_dim, int seqlen,
     return {cost, sint};
 }
 
-void apply_rotary_emb(Tensor* xq, Tensor* xk, const FreqMatrix& cost, const FreqMatrix& sint) {
-    int batch = xq->shape()[0];
-    int seqlen = cost.size();
-    int dim = xq->shape()[2];
+void apply_rotary_emb(
+        std::vector<std::vector<Tensor>>* xq,
+        std::vector<std::vector<Tensor>>* cachek,
+        const FreqMatrix& cost,
+        const FreqMatrix& sint,
+        int start_pos,
+        int seqlen) {
+    int batch = xq->size();
+    int dim = (*xq)[0][0].shape()[0];
     int num_complex = cost[0].size();
     int head_dim = num_complex * 2;
     int num_head = dim / head_dim;
     assert(dim % head_dim == 0);
-    
-    
+    assert(cost.size() == seqlen);
+
     for (int b = 0; b < batch; b++) {
-        for (int i = 0; i < seqlen; i++) {
+        int i = 0;
+        int ik = start_pos;
+        for (; i < seqlen; i++, ik++) {
             int p0 = 0;
             int p1 = 1;
             for (int j = 0; j < num_head; j++) {
                 for (int k = 0; k < num_complex; k++, p0+=2, p1+=2) {
-                    float xq0 = (*xq)(b, i, p0);
-                    float xq1 = (*xq)(b, i, p1);
-                    xq->set(xq0 * cost[i][k] - xq1 * sint[i][k], b, i, p0);
-                    xq->set(xq1 * cost[i][k] + xq0 * sint[i][k], b, i, p1);
+                    float xq0 = (*xq)[b][i](p0);
+                    float xq1 = (*xq)[b][i](p1);
+                    (*xq)[b][i].set(xq0 * cost[i][k] - xq1 * sint[i][k], p0);
+                    (*xq)[b][i].set(xq1 * cost[i][k] + xq0 * sint[i][k], p1);
 
-                    float xk0 = (*xk)(b, i, p0);
-                    float xk1 = (*xk)(b, i, p1);
-                    xk->set(xk0 * cost[i][k] - xk1 * sint[i][k], b, i, p0);
-                    xk->set(xk1 * cost[i][k] + xk0 * sint[i][k], b, i, p1);
+                    float xk0 = (*cachek)[b][ik](p0);
+                    float xk1 = (*cachek)[b][ik](p1);
+                    (*cachek)[b][i].set(xk0 * cost[i][k] - xk1 * sint[i][k], p0);
+                    (*cachek)[b][i].set(xk1 * cost[i][k] + xk0 * sint[i][k], p1);
                 }
             }
         }

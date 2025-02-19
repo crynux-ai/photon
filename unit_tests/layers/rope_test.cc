@@ -21,9 +21,34 @@ TEST(RopeTest, RopeTest) {
     xk.build(loader.Read(tensor_size));
     pq.build(loader.Read(tensor_size));
     pk.build(loader.Read(tensor_size));
+    int dim = xq.shape()[2];
+
+    std::vector<std::vector<Tensor>> vxq(batch);
+    std::vector<std::vector<Tensor>> vxk(batch);
+
+    for (int i = 0; i < batch; i++) {
+        for (int j = 0; j < seqlen; j++) {
+            vxq[i].push_back(Tensor({dim}));
+            vxk[i].push_back(Tensor({dim}));
+            for (int k = 0; k < dim; k++) {
+                vxq[i][j].set(xq(i, j, k), k);
+                vxk[i][j].set(xk(i, j, k), k);
+            }
+        }
+    }
 
     auto freqs_ics = precompute_freqs_cis(head_dim, seqlen, 10000.0);
-    apply_rotary_emb(&xq, &xk, freqs_ics.first, freqs_ics.second);
+    apply_rotary_emb(&vxq, &vxk, freqs_ics.first, freqs_ics.second, 0, seqlen);
+
+    for (int i = 0; i < batch; i++) {
+        for (int j = 0; j < seqlen; j++) {
+            for (int k = 0; k < xq.shape()[2]; k++) {
+                xq.set(vxq[i][j](k), i, j, k);
+                xk.set(vxk[i][j](k), i, j, k);
+            }
+        }
+    }
+
     EXPECT_EQ(xq.eq(pq), true);
     EXPECT_EQ(xk.eq(pk), true);
 }

@@ -22,17 +22,11 @@ public:
             _base[i] = _cnt;
             _cnt *= shape[i];
         }
-        _value = new float[_cnt];
-    }
-
-    ~Tensor() {
-        if (_value) {
-            delete[] _value;
-        }
+        _value = std::unique_ptr<float[]>(new float[_cnt]);
     }
 
     void zero() {
-        memset(_value, 0, sizeof(float) * _cnt);
+        memset(_value.get(), 0, sizeof(float) * _cnt);
     }
     
     const std::vector<int>& shape() const {
@@ -60,8 +54,8 @@ public:
             _cnt *= _shape[i];
         }
 
-        _value = new float[_cnt];
-        std::memcpy(_value, ptr, 4 * _cnt);
+        _value = std::unique_ptr<float[]>(new float[_cnt]);
+        std::memcpy(_value.get(), ptr, 4 * _cnt);
     }
 
     bool eq(const Tensor& other, bool check_all=false) {
@@ -122,7 +116,7 @@ protected:
     std::vector<int> _shape;
     std::vector<int> _base;
     int _cnt;
-    float* _value;
+    std::unique_ptr<float[]> _value;
     
 };
 
