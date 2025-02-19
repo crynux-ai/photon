@@ -1,4 +1,5 @@
 #include "layers/tokenizer.h"
+#include "schema/loader.h"
 
 #include <iostream>
 #include <fstream>
@@ -33,41 +34,20 @@ TEST(TokenizerTest, EncodeDecode) {
 TEST(TokenizerTest, MatchPython) {
     Tokenizer tokenizer;
     tokenizer.build("models/tokenizer.model");
+    Loader loader("unit_tests/testdata/sentencepiece.dat");
+    int num_cases = loader.ReadInt();
 
-    std::ifstream data("testdata/sentencepiece.dat");
-    if (!data) {
-        std::cerr << "Error opening file." << std::endl;
-        return;
-    }
-
-    std::vector<std::vector<int>> tokens;
+    std::vector<std::vector<int>> tokens(num_cases);
     std::vector<std::string> texts;
-    std::string line;
-
-    // Process test data
-    while (std::getline(data, line)) {
-        texts.push_back(line);
-
-        std::vector<int> item;
-        std::getline(data, line);
-        std::istringstream iss(line);
-        std::string token;
-
-        // Use comma as delimiter
-        while (std::getline(iss, token, ',')) {
-            // Remove possible spaces
-            token.erase(0, token.find_first_not_of(" \t"));
-            token.erase(token.find_last_not_of(" \t") + 1);
-            try {
-                int num = std::stoi(token);
-                item.push_back(num);
-            } catch (const std::exception& e) {
-                std::cerr << "Conversion error: " << token << " is not a valid integer." << std::endl;
-            }
+    for (int i = 0; i < num_cases; i++) {
+        int len = loader.ReadInt();
+        std::string str(loader.Read(len));
+        texts.push_back(str);
+        len = loader.ReadInt();
+        for (int j = 0; j < len; j++) {
+            tokens[i].push_back(loader.ReadInt());
         }
-        tokens.push_back(item);
     }
-
     for (int i = 0; i < texts.size(); i++) {
         EXPECT_EQ(tokens[i], tokenizer.encode(texts[i], true, true));
         EXPECT_EQ(texts[i], tokenizer.decode(tokens[i]));

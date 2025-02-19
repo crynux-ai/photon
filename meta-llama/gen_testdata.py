@@ -4,10 +4,10 @@ import model
 import torch
 import struct
 
-def encode(content: str) -> str:
-    t = Tokenizer("models/tokenizer.model")
-    res = t.encode(content, True, True)
-    return ", ".join(map(str, res))
+def tokenize(content: str) -> list[int]:
+    tokenizer = Tokenizer("models/tokenizer.model")
+    res = tokenizer.encode(content, True, True)
+    return res
 
 
 def gen_tokenizer_data():
@@ -22,14 +22,17 @@ def gen_tokenizer_data():
  mechanics and exhibit wave–particle duality, their behavior featuring properties of both waves and particles.""",
     ]
 
-    token = [encode(t) for t in text]
+    token = [tokenize(t) for t in text]
 
-    with open("unit_tests/testdata/sentencepiece.dat", "w") as file:
+    with open("unit_tests/testdata/sentencepiece.dat", "wb") as file:
+        file.write(struct.pack("i", 3))
         for i in range(len(text)):
-            file.write(text[i])
-            file.write("\n")
-            file.write(token[i])
-            file.write("\n")
+            btext = text[i].encode("utf-8")
+            file.write(struct.pack("i", len(btext)))
+            file.write(btext)
+            file.write(struct.pack("i", len(token[i])))
+            for j in token[i]:
+                file.write(struct.pack("i", j))
 
 def tensor_to_bytes(tensor):
     data = struct.pack("i", len(tensor.shape))
@@ -55,18 +58,43 @@ def gen_feedforward_data():
         file.write(tensor_to_bytes(x))
         file.write(tensor_to_bytes(y))
 
+def mask(seqlen, start_pos):
+    mask = torch.full((seqlen, seqlen), float("-inf"))
+    mask = torch.triu(mask, diagonal=1)
+    mask = torch.hstack([
+        torch.zeros((seqlen, start_pos)),
+        mask
+    ])
+    return mask
+
+
 def gen_attention_data():
-    layer = model.FeedForward(dim=256, hidden_dim=1024, multiple_of=4, ffn_dim_multiplier=None)
-    x = torch.randn(1, 256)
-    y = layer(x)
-    print(y.shape)
-    with open("unit_tests/testdata/feedforward.dat", "wb") as file:
-        file.write(struct.pack("i", 256) + struct.pack("i", 1024) + struct.pack("i", 4))
-        file.write(tensor_to_bytes(layer.w1.weight))
-        file.write(tensor_to_bytes(layer.w2.weight))
-        file.write(tensor_to_bytes(layer.w3.weight))
-        file.write(tensor_to_bytes(x))
-        file.write(tensor_to_bytes(y))
+    freqs_cis = model.precompute_freqs_cis(64, 99, 10000.0)
+    layer = model.Attention(model.ModelArgs(dim=256, n_heads=4, multiple_of=4))
+
+    x1 = torch.randn(3, 7, 256)
+    y1 = layer.forward(x1, 0, freqs_cis[0: 7], mask(7, 0))
+
+    x2 = torch.randn(3, 3, 256)
+    y2 = layer.forward(x2, 7, freqs_cis[7: 10], mask(3, 7))
+
+    x3 = torch.randn(3, 2, 256)
+    y3 = layer.forward(x3, 10, freqs_cis[10: 12], None)
+
+    with open("unit_tests/testdata/attention.dat", "wb") as file:
+        file.write(struct.pack("i", 256) + struct.pack("i", 4) + struct.pack("i", 4))  # layer
+        file.write(struct.pack("i", 64) + struct.pack("i", 99) + struct.pack("f", 10000.0)) # freqs
+        file.write(tensor_to_bytes(layer.wq.weight))
+        file.write(tensor_to_bytes(layer.wk.weight))
+        file.write(tensor_to_bytes(layer.wv.weight))
+        file.write(tensor_to_bytes(layer.wo.weight))
+        file.write(tensor_to_bytes(x1))
+        file.write(tensor_to_bytes(y1))
+        file.write(tensor_to_bytes(x2))
+        file.write(tensor_to_bytes(y2))
+        file.write(tensor_to_bytes(x3))
+        file.write(tensor_to_bytes(y3))
+
 
 def gen_rope_data():
     freqs_ics = model.precompute_freqs_cis(32, 77, 10000.0)
@@ -83,6 +111,7 @@ def gen_rope_data():
 
 
 if __name__ == '__main__':
-    # gen_tokenizer_data()
+    gen_tokenizer_data()
     # gen_feedforward_data()
-    gen_rope_data()
+    # gen_rope_data()
+    # gen_attention_data()
