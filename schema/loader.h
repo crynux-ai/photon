@@ -46,6 +46,13 @@ public:
         return res;
     }
 
+    int ReadFloat() {
+        auto data = Read(4);
+        float res;
+        std::memcpy(&res, data.data(), 4);
+        return res;
+    }
+
 private:
     std::ifstream _file;
     std::streamsize _size;
