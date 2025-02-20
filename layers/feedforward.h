@@ -5,6 +5,7 @@
 #include "schema/tensor.h"
 #include "layers/math.h"
 
+#include <cassert>
 
 class FFNSwiGLU {
 
@@ -12,10 +13,10 @@ public:
     FFNSwiGLU(int dim, int hidden_dim, int multiple_of) {
         _dim = dim;
         _hidden_dim = multiple_of * ((2 * hidden_dim / 3 + multiple_of - 1) / multiple_of);
-        _w1 = Tensor({_hidden_dim, _dim});
-        _w2 = Tensor({_dim, _hidden_dim});
-        _w3 = Tensor({_hidden_dim, _dim});
-        
+    }
+
+    size_t size() {
+        return 3 * (_dim * _hidden_dim * 4 + 12);
     }
 
     void build(std::string_view content) {
@@ -29,29 +30,39 @@ public:
         _w3.build({ptr, static_cast<size_t>(weight_size)});
     }
 
-    Tensor forward(const Tensor& input) {
+    Tensor forward(const Tensor& input, bool residual=false) {
+        assert(input.shape().size() == 3);
         int batch = input.shape()[0];
-        Tensor result(input.shape());
+        int seqlen = input.shape()[1];
+        assert(input.shape()[2] == _dim);
 
-        Tensor r1({batch, _hidden_dim});
+        Tensor r1({batch, _dim, _hidden_dim});
         r1.zero();
-        result.zero();
-        for (int i = 0; i < batch; i++) {
-            for (int j = 0; j < _hidden_dim; j++) {
-                float val1 = 0;
-                float val2 = 0;
-                for (int k = 0; k < _dim; k++) {
-                    val1 += input(i, k) * _w1(j, k);
-                    val2 += input(i, k) * _w3(j, k);
+        for (int b = 0; b < batch; b++) {
+            for (int i = 0; i < _dim; i++) {
+                for (int j = 0; j < _hidden_dim; j++) {
+                    float val1 = 0;
+                    float val2 = 0;
+                    for (int k = 0; k < _dim; k++) {
+                        val1 += input(b, i, k) * _w1(j, k);
+                        val2 += input(b, i, k) * _w3(j, k);
+                    }
+                    r1.set(val1 * val2 * sigmoid(val1), b, i, j);
                 }
-                r1.set(val1 * val2 * sigmoid(val1), i, j);
             }
         }
 
-        for (int i = 0; i < batch; i++) {
-            for (int j = 0; j < _dim; j++) {
-                for (int k = 0; k < _hidden_dim; k++) {
-                    result.add(r1(i, k) * _w2(j, k), i, j);
+        Tensor result(input.shape());
+        result.zero();
+        for (int b = 0; b < batch; b++) {
+            for (int i = 0; i < seqlen; i++) {
+                for (int j = 0; j < _dim; j++) {
+                    if (residual) {
+                        result.add(input(b, i, j));
+                    }
+                    for (int k = 0; k < _hidden_dim; k++) {
+                        result.add(r1(b, i, k) * _w2(j, k), b, i, j);
+                    }
                 }
             }
         }

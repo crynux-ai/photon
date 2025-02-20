@@ -12,16 +12,14 @@ TEST(FeedForwardTest, FFNSwiGLUTest) {
     int dim = loader.ReadInt();
     int hidden_dim = loader.ReadInt();
     int multiple_of = loader.ReadInt();
-    int layer_size = (256 * 684 * 4 + 12) * 3;
 
     FFNSwiGLU ffn(dim, hidden_dim, multiple_of);
-    ffn.build(loader.Read(layer_size));
-    
+    ffn.build(loader.Read(ffn.size()));
 
-    int tensor_size = 256 * 4 + 12;
-    Tensor x({1, dim});
+    int tensor_size = 3 * 7 * 256 * 4 + 16;
+    Tensor x;
     x.build(loader.Read(tensor_size));
-    Tensor y({1, dim});
+    Tensor y;
     y.build(loader.Read(tensor_size));
 
     auto z = ffn.forward(x);

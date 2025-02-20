@@ -47,9 +47,8 @@ def tensor_to_bytes(tensor):
 
 def gen_feedforward_data():
     layer = model.FeedForward(dim=256, hidden_dim=1024, multiple_of=4, ffn_dim_multiplier=None)
-    x = torch.randn(1, 256)
+    x = torch.randn(3, 7, 256)
     y = layer(x)
-    print(y.shape)
     with open("unit_tests/testdata/feedforward.dat", "wb") as file:
         file.write(struct.pack("i", 256) + struct.pack("i", 1024) + struct.pack("i", 4))
         file.write(tensor_to_bytes(layer.w1.weight))
@@ -114,6 +113,7 @@ def gen_rope_data():
 
 if __name__ == '__main__':
     # gen_tokenizer_data()
-    # gen_feedforward_data()
+    gen_feedforward_data()
     # gen_rope_data()
-    gen_attention_data()
+    # gen_attention_data()
+    # gen_transformer_data()
