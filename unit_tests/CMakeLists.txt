@@ -1,5 +1,7 @@
 # cmake -DCMAKE_BUILD_TYPE=Debug .. && make
 
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+
 cmake_minimum_required(VERSION 3.12)
 
 file(GLOB SRCS "**/*.cc" "**/*.h")
