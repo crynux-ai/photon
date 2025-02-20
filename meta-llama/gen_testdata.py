@@ -2,6 +2,7 @@ from tokenizer import Tokenizer
 import model
 
 import torch
+import time
 import struct
 
 def tokenize(content: str) -> list[int]:
@@ -142,7 +143,9 @@ def gen_transformer_data():
         file.write(tensor_to_bytes(layer.output.weight))
 
         token = torch.randint(0, 1037, (3, 7))
+        start = time.time()
         output = layer.forward(token, 0)
+        print("time: ", time.time() - start)
         for i in range(3):
             for j in range(7):
                 file.write(struct.pack("i", token[i][j].item()))

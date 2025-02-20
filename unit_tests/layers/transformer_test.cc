@@ -4,8 +4,10 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
 #include <gtest/gtest.h>
 
+using namespace std::chrono;
 
 TEST(Transformer, TransformerTest) {
     Loader loader("unit_tests/testdata/transformer.dat");
@@ -54,7 +56,12 @@ TEST(Transformer, TransformerTest) {
 
     int start_pos = 0;
     for (int i = 0; i < num_cases; i++) {
+        auto start = high_resolution_clock::now();
         auto result = layer.forward(inputs[i], start_pos);
+        auto stop = high_resolution_clock::now();
+        auto duration = duration_cast<microseconds>(stop - start);
+        std::cout << "Time: " << duration.count() << " microseconds" << std::endl;
+
         start_pos += inputs[i][0].size();
         EXPECT_EQ(result.eq(outputs[i]), true);
     }
