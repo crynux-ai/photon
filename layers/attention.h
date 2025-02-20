@@ -16,11 +16,10 @@ public:
         _num_heads = num_heads;
         _head_dim = dim / num_heads;
         assert(dim % num_heads == 0);
+    }
 
-        _wq = Tensor({_dim, _dim});
-        _wk = Tensor({_dim, _dim});
-        _wv = Tensor({_dim, _dim});
-        _wo = Tensor({_dim, _dim});
+    size_t size() {
+        return 4 * (_dim * _dim * 4 + 12);
     }
 
     void build(std::string_view content) {
@@ -36,7 +35,8 @@ public:
         _wo.build({ptr, static_cast<size_t>(weight_size)});
     }
 
-    Tensor forward(const Tensor& input, const std::pair<FreqMatrix, FreqMatrix>& rope, int start_pos, bool mask) {
+    Tensor forward(const Tensor& input, const std::pair<FreqMatrix, FreqMatrix>& rope, int start_pos,
+                   bool mask, Tensor* residual=nullptr) {
         int batch = input.shape()[0];
         int seqlen = input.shape()[1];
         if (_cachek.empty()) {
@@ -131,6 +131,9 @@ public:
                         for (int j = 0; j < _head_dim; j++, ptr++) {
                             result.add(_wo(i, ptr) * output[b][h](l, j), b, l, i);
                         }
+                    }
+                    if (residual) {
+                        result.add((*residual)(b, l, i), b, l, i);
                     }
                 }
             }

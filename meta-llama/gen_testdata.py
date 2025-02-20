@@ -111,9 +111,61 @@ def gen_rope_data():
         file.write(tensor_to_bytes(pk.view(3, 7, 128)))
 
 
+def gen_transformer_data():
+    freqs_cis = model.precompute_freqs_cis(32, 77, 10000.0)
+    layer = model.Transformer(model.ModelArgs(
+        dim=128,
+        n_layers=3,
+        n_heads=4,
+        multiple_of=4,
+        vocab_size=1037))
+
+    with open("unit_tests/testdata/transformer.dat", "wb") as file:
+        file.write(struct.pack("i", 32) + struct.pack("i", 77))
+        file.write(struct.pack("i", 128) + struct.pack("i", 3) + struct.pack("i", 4))
+        file.write(struct.pack("i", 4) + struct.pack("i", 1037))
+        file.write(struct.pack("i", 3))
+        file.write(struct.pack("i", 3) + struct.pack("i", 7))
+        file.write(struct.pack("i", 3) + struct.pack("i", 3))
+        file.write(struct.pack("i", 3) + struct.pack("i", 2))
+        for i in range(3):
+            attention = layer.layers[i].attention
+            ffn = layer.layers[i].feed_forward
+            file.write(tensor_to_bytes(attention.wq.weight))
+            file.write(tensor_to_bytes(attention.wk.weight))
+            file.write(tensor_to_bytes(attention.wv.weight))
+            file.write(tensor_to_bytes(attention.wo.weight))
+            file.write(tensor_to_bytes(ffn.w1.weight))
+            file.write(tensor_to_bytes(ffn.w2.weight))
+            file.write(tensor_to_bytes(ffn.w3.weight))
+        file.write(tensor_to_bytes(layer.tok_embeddings.weight))
+        file.write(tensor_to_bytes(layer.output.weight))
+
+        token = torch.randint(0, 1037, (3, 7))
+        output = layer.forward(token, 0)
+        for i in range(3):
+            for j in range(7):
+                file.write(struct.pack("i", token[i][j].item()))
+        file.write(tensor_to_bytes(output))
+
+        token = torch.randint(0, 1037, (3, 3))
+        output = layer.forward(token, 7)
+        for i in range(3):
+            for j in range(3):
+                file.write(struct.pack("i", token[i][j].item()))
+        file.write(tensor_to_bytes(output))
+
+        token = torch.randint(0, 1037, (3, 2))
+        output = layer.forward(token, 10)
+        for i in range(3):
+            for j in range(2):
+                file.write(struct.pack("i", token[i][j].item()))
+        file.write(tensor_to_bytes(output))
+
+
 if __name__ == '__main__':
     # gen_tokenizer_data()
-    gen_feedforward_data()
+    # gen_feedforward_data()
     # gen_rope_data()
     # gen_attention_data()
-    # gen_transformer_data()
+    gen_transformer_data()

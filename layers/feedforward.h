@@ -30,7 +30,7 @@ public:
         _w3.build({ptr, static_cast<size_t>(weight_size)});
     }
 
-    Tensor forward(const Tensor& input, bool residual=false) {
+    Tensor forward(const Tensor& input, Tensor* residual=nullptr) {
         assert(input.shape().size() == 3);
         int batch = input.shape()[0];
         int seqlen = input.shape()[1];
@@ -58,7 +58,7 @@ public:
             for (int i = 0; i < seqlen; i++) {
                 for (int j = 0; j < _dim; j++) {
                     if (residual) {
-                        result.add(input(b, i, j));
+                        result.add((*residual)(b, i, j), b, i, j);
                     }
                     for (int k = 0; k < _hidden_dim; k++) {
                         result.add(r1(b, i, k) * _w2(j, k), b, i, j);
