@@ -28,7 +28,7 @@ target_include_directories(photon PUBLIC . )
 
 
 
-# layers
+# schema
 FetchContent_Declare(
     sentencepiece
     GIT_REPOSITORY https://github.com/google/sentencepiece

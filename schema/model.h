@@ -1,12 +1,11 @@
-#ifndef LAYERS_TOKENIZER_H
-#define LAYERS_TOKENIZER_H
+#ifndef SCHEMA_MODEL_H
+#define SCHEMA_MODEL_H
 
-#include "src/sentencepiece_processor.h"
 
 #include <string_view>
 #include <vector>
 
-class Tokenizer {
+class Model {
 
 public:
     Tokenizer() {}
@@ -16,4 +15,4 @@ public:
     sentencepiece::SentencePieceProcessor processor;
 };
 
-#endif // LAYERS_TOKENIZER_H
+#endif // SCHEMA_MODEL_H
