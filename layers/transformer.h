@@ -1,12 +1,13 @@
 #ifndef LAYERS_TRANSFORMER_H
 #define LAYERS_TRANSFORMER_H
 
+#include "include/backend.h"
+#include "include/feedforward.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
-#include "layers/math.h"
+#include "layers/math_utils.h"
 #include "layers/rope.h"
 #include "layers/attention.h"
-#include "layers/feedforward.h"
 #include "layers/norm.h"
 #include <cmath>
 
@@ -21,6 +22,7 @@ struct ModelArgs {
 };
 
 
+template <BackendType backend>
 class Transformer {
 
 public:
@@ -30,7 +32,7 @@ public:
 
         for (int i = 0; i < args.num_layers; i++) {
             _attention.push_back(Attention(args.dim, args.num_heads));
-            _ffn.push_back(FFNSwiGLU(args.dim, args.dim * 4, args.multiple_of));
+            _ffn.push_back(FFNSwiGLU<backend>(args.dim, args.dim * 4, args.multiple_of));
         }
         _rope = precompute_freqs_cis(args.dim / args.num_heads, args.max_seq_len, 10000.0);
     }
@@ -101,7 +103,7 @@ public:
 
 private:
     std::vector<Attention> _attention;
-    std::vector<FFNSwiGLU> _ffn;
+    std::vector<FFNSwiGLU<backend>> _ffn;
     std::pair<FreqMatrix, FreqMatrix> _rope;
     Tensor _token_embeddings;
     Tensor _wo;

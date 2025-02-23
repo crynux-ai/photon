@@ -3,7 +3,7 @@
 
 #include "schema/loader.h"
 #include "schema/tensor.h"
-#include "layers/math.h"
+#include "layers/math_utils.h"
 #include "layers/rope.h"
 #include <cmath>
 

@@ -19,11 +19,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-target_link_libraries(tokenizer_test PRIVATE layers gtest_main)
-target_link_libraries(feedforward_test PRIVATE layers gtest_main)
-target_link_libraries(rope_test PRIVATE layers gtest_main)
-target_link_libraries(attention_test PRIVATE layers gtest_main)
-target_link_libraries(transformer_test PRIVATE layers gtest_main)
+target_compile_definitions(feedforward_test PUBLIC -DPHOTON_CPU)
+target_link_libraries(tokenizer_test PRIVATE photon gtest_main)
+target_link_libraries(feedforward_test PRIVATE photon gtest_main)
+target_link_libraries(rope_test PRIVATE photon gtest_main)
+target_link_libraries(attention_test PRIVATE photon gtest_main)
+target_link_libraries(transformer_test PRIVATE photon gtest_main)
 
 # Register the test with CTest
 add_test(NAME TokenizerTest COMMAND tokenizer_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -1,4 +1,5 @@
-#include "layers/feedforward.h"
+#include "include/backend.h"
+#include "include/feedforward.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
 
@@ -13,7 +14,7 @@ TEST(FeedForwardTest, FFNSwiGLUTest) {
     int hidden_dim = loader.ReadInt();
     int multiple_of = loader.ReadInt();
 
-    FFNSwiGLU ffn(dim, hidden_dim, multiple_of);
+    FFNSwiGLU<CURRENT_BACKEND> ffn(dim, hidden_dim, multiple_of);
     ffn.build(loader.Read(ffn.size()));
 
     int tensor_size = 3 * 7 * 256 * 4 + 16;

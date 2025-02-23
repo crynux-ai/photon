@@ -1,3 +1,4 @@
+#include "include/backend.h"
 #include "layers/transformer.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
@@ -35,7 +36,7 @@ TEST(Transformer, TransformerTest) {
         .multiple_of = multiple_of,
         .max_seq_len = maxseqlen,
     };
-    Transformer layer(args);
+    Transformer<BackendType::CPU> layer(args);
     layer.build(loader.Read(layer.size()));
     
     std::vector<std::vector<std::vector<int>>> inputs;
