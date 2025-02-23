@@ -1,4 +1,5 @@
-#include "layers/attention.h"
+#include "include/backend.h"
+#include "include/attention.h"
 #include "layers/rope.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
@@ -20,7 +21,7 @@ TEST(AttentionTest, AttentionTest) {
     
     Tensor wq, wk, wv, wo;
     int tensor_size = dim * dim * 4 + 12;
-    Attention layer(dim, num_head);
+    Attention<BackendType::CPU> layer(dim, num_head);
     layer.build(loader.Read((dim * dim * 4 + 12) * 4));
 
     Tensor x1, y1, x2, y2, x3, y3, p1, p2, p3;

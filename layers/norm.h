@@ -1,5 +1,4 @@
-#ifndef LAYERS_NORM_H
-#define LAYERS_NORM_H
+#pragma once
 
 #include "schema/tensor.h"
 
@@ -30,7 +29,4 @@ Tensor RMSNorm(const Tensor& x, float norm_eps) {
     }
     return result;
 }
-
-#endif  // LAYERS_NORM_H
-
 

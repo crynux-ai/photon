@@ -1,5 +1,4 @@
-#ifndef SCHEMA_LAYER_H
-#define SCHEMA_LAYER_H
+#pragma once
 
 #include <fstream>
 #include <string_view>
@@ -58,5 +57,3 @@ private:
     std::streamsize _size;
     char* _buffer;
 };
-
-#endif  // SCHEMA_MODEL_H

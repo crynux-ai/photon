@@ -1,6 +1,4 @@
-#ifndef SCHEMA_MODEL_H
-#define SCHEMA_MODEL_H
-
+#pragma once
 
 #include <string_view>
 #include <vector>
@@ -14,5 +12,3 @@ public:
     std::string decode(const std::vector<int>& token_ids);
     sentencepiece::SentencePieceProcessor processor;
 };
-
-#endif // SCHEMA_MODEL_H

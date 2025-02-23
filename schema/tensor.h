@@ -1,6 +1,4 @@
-#ifndef SCHEMA_TENSOR_H
-#define SCHEMA_TENSOR_H
-
+#pragma once
 
 #include <string_view>
 #include <vector>
@@ -119,5 +117,3 @@ protected:
     std::unique_ptr<float[]> _value;
     
 };
-
-#endif // SCHEMA_TENSOR_H
