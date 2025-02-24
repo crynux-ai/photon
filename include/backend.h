@@ -6,10 +6,10 @@ enum class BackendType {
     METAL
 };
 
-#ifdef METAL
+#ifdef PHOTON_METAL
     #define CURRENT_BACKEND BackendType::METAL
 #else
-    #ifdef CUDA
+    #ifdef PHOTON_CUDA
         #define CURRENT_BACKEND BackendType::CUDA
     #else
         #define CURRENT_BACKEND BackendType::CPU

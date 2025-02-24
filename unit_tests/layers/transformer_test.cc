@@ -36,7 +36,7 @@ TEST(Transformer, TransformerTest) {
         .multiple_of = multiple_of,
         .max_seq_len = maxseqlen,
     };
-    Transformer<BackendType::CPU> layer(args);
+    Transformer<CURRENT_BACKEND> layer(args);
     layer.build(loader.Read(layer.size()));
     
     std::vector<std::vector<std::vector<int>>> inputs;

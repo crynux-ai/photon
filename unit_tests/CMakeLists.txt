@@ -1,4 +1,4 @@
-# cmake -DCMAKE_BUILD_TYPE=Debug .. && make
+# cmake -DPLATFORM=METAL -DCMAKE_BUILD_TYPE=Debug .. && make
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
@@ -19,7 +19,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-target_compile_definitions(feedforward_test PUBLIC -DPHOTON_CPU)
+target_compile_definitions(tokenizer_test PUBLIC ${PLATFORM_MACRO})
+target_compile_definitions(feedforward_test PUBLIC ${PLATFORM_MACRO})
+target_compile_definitions(rope_test PUBLIC ${PLATFORM_MACRO})
+target_compile_definitions(attention_test PUBLIC ${PLATFORM_MACRO})
+target_compile_definitions(transformer_test PUBLIC ${PLATFORM_MACRO})
+
 target_link_libraries(tokenizer_test PRIVATE photon gtest_main)
 target_link_libraries(feedforward_test PRIVATE photon gtest_main)
 target_link_libraries(rope_test PRIVATE photon gtest_main)

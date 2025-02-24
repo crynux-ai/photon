@@ -3,9 +3,10 @@ project("photon" CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
-option(BUILD_CPU "Build with CPU backend" ON)
-option(BUILD_CUDA "Build with CUDA backend" OFF)
-option(BUILD_METAL "Build with Metal backend" OFF)
+
+set(PLATFORM "CPU" CACHE STRING "Select an option: CPU, METAL, CUDA")
+set_property(CACHE PLATFORM PROPERTY STRINGS "CPU;METAL;CUDA")
+
 
 include(FetchContent)
 
@@ -18,14 +19,16 @@ file(
 )
 
 
-if(BUILD_METAL)
+if(PLATFORM STREQUAL "METAL")
+    set(PLATFORM_MACRO -DPHOTON_METAL)
+    add_library(photon STATIC ${SRCS})
 else()
+    set(PLATFORM_MACRO -DPHOTON_CPU)
     file(GLOB CPU_SRCS "cpu/*.cc" "cpu/*.h")
     add_library(photon STATIC ${SRCS} ${CPU_SRCS})
 endif()
 
 target_include_directories(photon PUBLIC . )
-
 
 
 # schema
