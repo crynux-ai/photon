@@ -57,3 +57,8 @@ TEST(RopeTest, RopeTest) {
     EXPECT_EQ(xq.eq(pq), true);
     EXPECT_EQ(xk.eq(pk), true);
 }
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}

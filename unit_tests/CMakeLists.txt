@@ -4,7 +4,6 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 cmake_minimum_required(VERSION 3.12)
 
-file(GLOB SRCS "**/*.cc" "**/*.h")
 add_executable(tokenizer_test "layers/tokenizer_test.cc")
 add_executable(feedforward_test "layers/feedforward_test.cc")
 add_executable(rope_test "layers/rope_test.cc")
@@ -32,7 +31,8 @@ target_link_libraries(attention_test PRIVATE photon gtest_main)
 target_link_libraries(transformer_test PRIVATE photon gtest_main)
 
 # Register the test with CTest
-add_test(NAME TokenizerTest COMMAND tokenizer_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+find_package(GTest REQUIRED)
+add_test(NAME TokenzerTest COMMAND tokenizer_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_test(NAME FeedforwardTest COMMAND feedforward_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_test(NAME RopeTest COMMAND rope_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_test(NAME AttentionTest COMMAND attention_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
