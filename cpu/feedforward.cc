@@ -10,10 +10,10 @@ Tensor FFNSwiGLU<BackendType::CPU>::forward(const Tensor& input, Tensor* residua
     int seqlen = input.shape()[1];
     assert(input.shape()[2] == _dim);
 
-    Tensor r1({batch, _dim, _hidden_dim});
+    Tensor r1({batch, seqlen, _hidden_dim});
     r1.zero();
     for (int b = 0; b < batch; b++) {
-        for (int i = 0; i < _dim; i++) {
+        for (int i = 0; i < seqlen; i++) {
             for (int j = 0; j < _hidden_dim; j++) {
                 float val1 = 0;
                 float val2 = 0;
