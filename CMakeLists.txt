@@ -1,14 +1,10 @@
 cmake_minimum_required(VERSION 3.11)
-project("photon" CXX)
-
-set(CMAKE_CXX_STANDARD 20)
-
 
 set(PLATFORM "CPU" CACHE STRING "Select an option: CPU, METAL, CUDA")
 set_property(CACHE PLATFORM PROPERTY STRINGS "CPU;METAL;CUDA")
 
-
-include(FetchContent)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # photon binary
 file(
@@ -18,20 +14,70 @@ file(
     "layers/*.h" "layers/*.cc"
 )
 
-
 if(PLATFORM STREQUAL "METAL")
     set(PLATFORM_MACRO -DPHOTON_METAL)
+    project("photon" LANGUAGES C CXX OBJCXX)
+
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+    find_library(METAL_FRAMEWORK Metal REQUIRED)
+    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+    find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
+
+    file(GLOB METAL_SRC "metal/*.mm" "metal/*.h")
+
+    # Build metal
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
+        COMMAND xcrun -sdk macosx metal -c ${CMAKE_CURRENT_SOURCE_DIR}/metal/feedforward.metal -o ${CMAKE_CURRENT_BINARY_DIR}/photon.air
+        COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/photon.air -o ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/metal/feedforward.metal
+        COMMENT "Compiling photon.metal into metallib"
+    )
+    add_custom_target(metallib ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib)
+
+    # Build objc lib
+    add_library(photon_metallib STATIC ${CMAKE_CURRENT_SOURCE_DIR}/metal/feedforward.mm)
+    target_sources(photon_metallib PRIVATE ${METAL_SRCS})
+    target_include_directories(photon_metallib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_options(photon_metallib PRIVATE ${PLATFORM_MACRO})
+    target_link_libraries(photon_metallib
+        ${METAL_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+        ${QUARTZCORE_FRAMEWORK}
+    )
+
+    # Build photon
     add_library(photon STATIC ${SRCS})
+    target_include_directories(photon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_options(photon PRIVATE ${PLATFORM_MACRO})
+    target_link_libraries(photon photon_metallib)
+    add_custom_command(TARGET photon POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
+            $<TARGET_FILE_DIR:photon>
+        COMMENT "Copying photon.metallib to output directory"
+    )
+    add_custom_command(TARGET photon POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
+            ${CMAKE_CURRENT_BINARY_DIR}/unit_tests
+        COMMENT "Copying photon.metallib to unit tests directory"
+    )
+
+    add_dependencies(photon metallib)
 else()
     set(PLATFORM_MACRO -DPHOTON_CPU)
+    project("photon" CXX)
     file(GLOB CPU_SRCS "cpu/*.cc" "cpu/*.h")
     add_library(photon STATIC ${SRCS} ${CPU_SRCS})
+    target_compile_options(photon PRIVATE ${PLATFORM_MACRO})
 endif()
 
 target_include_directories(photon PUBLIC . )
 
 
 # schema
+include(FetchContent)
 FetchContent_Declare(
     sentencepiece
     GIT_REPOSITORY https://github.com/google/sentencepiece

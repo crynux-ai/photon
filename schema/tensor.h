@@ -110,10 +110,11 @@ public:
     }
 
 
+    std::unique_ptr<float[]> _value;
+
 protected:
     std::vector<int> _shape;
     std::vector<int> _base;
-    int _cnt;
-    std::unique_ptr<float[]> _value;
+    int _cnt;    
     
 };

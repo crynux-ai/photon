@@ -26,4 +26,12 @@ template <> class FFNSwiGLU<BackendType::CPU>;
 
 template <> class FFNSwiGLU<BackendType::METAL>;
 
-#include "cpu/feedforward.h"
+
+#ifdef PHOTON_METAL
+#include "metal/feedforward.h"
+#else
+    #ifdef PHOTON_CUDA
+    #else
+        #include "cpu/feedforward.h"
+    #endif
+#endif

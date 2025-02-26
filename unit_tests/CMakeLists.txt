@@ -24,11 +24,22 @@ target_compile_definitions(rope_test PUBLIC ${PLATFORM_MACRO})
 target_compile_definitions(attention_test PUBLIC ${PLATFORM_MACRO})
 target_compile_definitions(transformer_test PUBLIC ${PLATFORM_MACRO})
 
-target_link_libraries(tokenizer_test PRIVATE photon gtest_main)
-target_link_libraries(feedforward_test PRIVATE photon gtest_main)
-target_link_libraries(rope_test PRIVATE photon gtest_main)
-target_link_libraries(attention_test PRIVATE photon gtest_main)
-target_link_libraries(transformer_test PRIVATE photon gtest_main)
+
+if(PLATFORM STREQUAL "METAL")
+    set(LINKS photon photon_metallib gtest_main)
+
+    target_compile_options(feedforward_test PRIVATE -x objective-c++)
+    target_include_directories(feedforward_test PRIVATE ${CMAKE_SOURCE_DIR}/metal)
+else()
+    set(LINKS photon gtest_main)
+endif()
+
+
+target_link_libraries(tokenizer_test PRIVATE ${LINKS})
+target_link_libraries(rope_test PRIVATE ${LINKS})
+target_link_libraries(attention_test PRIVATE ${LINKS})
+target_link_libraries(transformer_test PRIVATE ${LINKS})
+target_link_libraries(feedforward_test PRIVATE ${LINKS})
 
 # Register the test with CTest
 find_package(GTest REQUIRED)
