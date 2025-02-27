@@ -23,20 +23,36 @@ if(PLATFORM STREQUAL "METAL")
     find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
     find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
 
-    file(GLOB METAL_SRC "metal/*.mm" "metal/*.h")
-
     # Build metal
+    file(GLOB METAL_SHADER_FILES "metal/*.metal")
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/air_files"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/air_files"
+    )
+
+    set(METAL_AIR_FILES)
+    foreach(shader_file IN LISTS METAL_SHADER_FILES)
+        get_filename_component(shader_name ${shader_file} NAME_WE) # Get filename without extension
+        set(_output "${CMAKE_CURRENT_BINARY_DIR}/air_files/${shader_name}.air")
+        list(APPEND METAL_AIR_FILES "${_output}")
+        add_custom_command(
+            OUTPUT ${_output}
+            DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/air_files"
+            COMMAND xcrun -sdk macosx metal -c "${shader_file}" -o "${_output}"
+        )
+    endforeach()
+
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
-        COMMAND xcrun -sdk macosx metal -c ${CMAKE_CURRENT_SOURCE_DIR}/metal/feedforward.metal -o ${CMAKE_CURRENT_BINARY_DIR}/photon.air
-        COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/photon.air -o ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/metal/feedforward.metal
-        COMMENT "Compiling photon.metal into metallib"
+        DEPENDS ${METAL_AIR_FILES}
+        COMMAND xcrun -sdk macosx metallib ${METAL_AIR_FILES} -o ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
+        DEPENDS ${METAL_SHADER_FILES}
     )
     add_custom_target(metallib ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib)
 
     # Build objc lib
-    add_library(photon_metallib STATIC ${CMAKE_CURRENT_SOURCE_DIR}/metal/feedforward.mm)
+    file(GLOB METAL_SRC "metal/*.mm" "metal/*.h")
+    add_library(photon_metallib STATIC ${METAL_SRC})
     target_sources(photon_metallib PRIVATE ${METAL_SRCS})
     target_include_directories(photon_metallib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_options(photon_metallib PRIVATE ${PLATFORM_MACRO})
@@ -51,13 +67,17 @@ if(PLATFORM STREQUAL "METAL")
     target_include_directories(photon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_options(photon PRIVATE ${PLATFORM_MACRO})
     target_link_libraries(photon photon_metallib)
-    add_custom_command(TARGET photon POST_BUILD
+    add_custom_command(
+        TARGET photon POST_BUILD
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
             $<TARGET_FILE_DIR:photon>
         COMMENT "Copying photon.metallib to output directory"
     )
-    add_custom_command(TARGET photon POST_BUILD
+    add_custom_command(
+        TARGET photon POST_BUILD
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_CURRENT_BINARY_DIR}/photon.metallib
             ${CMAKE_CURRENT_BINARY_DIR}/unit_tests
