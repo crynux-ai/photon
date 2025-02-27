@@ -28,4 +28,11 @@ template <> class Attention<BackendType::CPU>;
 
 template <> class Attention<BackendType::METAL>;
 
-#include "cpu/attention.h"
+#ifdef PHOTON_METAL
+#include "metal/attention.h"
+#else
+    #ifdef PHOTON_CUDA
+    #else
+        #include "cpu/attention.h"
+    #endif
+#endif
