@@ -1,6 +1,6 @@
 #include "include/backend.h"
 #include "include/attention.h"
-#include "layers/rope.h"
+#include "include/rope.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
 

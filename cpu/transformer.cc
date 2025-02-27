@@ -1,6 +1,6 @@
 #include "cpu/transformer.h"
-#include "layers/math_utils.h"
-#include "layers/norm.h"
+#include "cpu/math_utils.h"
+#include "cpu/norm.h"
 
 #include <cassert>
 

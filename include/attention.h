@@ -1,7 +1,7 @@
 #pragma once
 
 #include "include/backend.h"
-#include "layers/rope.h"
+#include "include/rope.h"
 #include "schema/tensor.h"
 #include <cmath>
 

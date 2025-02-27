@@ -1,5 +1,5 @@
 #include "cpu/attention.h"
-#include "layers/math_utils.h"
+#include "cpu/math_utils.h"
 
 #include <cassert>
 
