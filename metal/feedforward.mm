@@ -10,28 +10,29 @@ Tensor FFNSwiGLU<BackendType::METAL>::forward(const Tensor& input, Tensor* resid
     assert(input.shape()[2] == _dim);
 
     @autoreleasepool {
-        id<MTLCommandQueue> commandQueue = [_device newCommandQueue];
-        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
-        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-        [computeEncoder setComputePipelineState:_pipelineState];
-        
         size_t inputByteSize = batch * seqlen * _dim * sizeof(float);
         size_t wByteSize = _dim * _hidden_dim * sizeof(float);
         size_t resByteSize = batch * seqlen * _hidden_dim * sizeof(float);
         int params[] = {batch, seqlen, _dim, _hidden_dim};
-        Tensor r1({batch, seqlen, _hidden_dim});
+        Tensor interres({batch, seqlen, _hidden_dim});
+
+        // silu(w1(x)) * w3(x)
+        id<MTLCommandQueue> commandQueue = [_device newCommandQueue];
+        id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+        [computeEncoder setComputePipelineState:_state1];
 
         id<MTLBuffer> bufferParam = [_device newBufferWithBytes:params length:4*sizeof(int) options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferInput = [_device newBufferWithBytes:input._value.get() length:inputByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferW1 = [_device newBufferWithBytes:_w1._value.get() length:wByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferW3 = [_device newBufferWithBytes:_w3._value.get() length:wByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferRes = [_device newBufferWithBytes:r1._value.get() length:resByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferInterres = [_device newBufferWithBytes:interres._value.get() length:resByteSize options:MTLResourceStorageModeShared];
 
         [computeEncoder setBuffer:bufferParam offset:0 atIndex:0];
         [computeEncoder setBuffer:bufferInput offset:0 atIndex:1];
         [computeEncoder setBuffer:bufferW1 offset:0 atIndex:2];
         [computeEncoder setBuffer:bufferW3 offset:0 atIndex:3];
-        [computeEncoder setBuffer:bufferRes offset:0 atIndex:4];
+        [computeEncoder setBuffer:bufferInterres offset:0 atIndex:4];
         
         MTLSize gridSize = MTLSizeMake(batch, seqlen, _hidden_dim);
         MTLSize threadgroupSize = MTLSizeMake(1, 1, 16);
@@ -40,24 +41,41 @@ Tensor FFNSwiGLU<BackendType::METAL>::forward(const Tensor& input, Tensor* resid
         [commandBuffer commit];
         [commandBuffer waitUntilCompleted];
 
-        float* tmp = static_cast<float*>(bufferRes.contents);
-        memcpy(r1._value.get(), tmp, resByteSize);
+        // w2(res)
+        commandQueue = [_device newCommandQueue];
+        commandBuffer = [commandQueue commandBuffer];
+        computeEncoder = [commandBuffer computeCommandEncoder];
+        [computeEncoder setComputePipelineState:_state2];
 
-        Tensor result(input.shape());
-        result.zero();
-        for (int b = 0; b < batch; b++) {
-            for (int i = 0; i < seqlen; i++) {
-                for (int j = 0; j < _dim; j++) {
-                    if (residual) {
-                        result.add((*residual)(b, i, j), b, i, j);
-                    }
-                    for (int k = 0; k < _hidden_dim; k++) {
-                        result.add(r1(b, i, k) * _w2(j, k), b, i, j);
-                    }
-                }
-            }
+        Tensor output(input.shape());
+        int params2[] = {batch, seqlen, _dim, _hidden_dim, residual ? 1 : 0};
+
+        bufferParam = [_device newBufferWithBytes:params2 length:5*sizeof(int) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferW2 = [_device newBufferWithBytes:_w2._value.get() length:wByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferOutput = [_device newBufferWithBytes:output._value.get() length:inputByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferResidual;
+        if (residual) {
+            bufferResidual = [_device newBufferWithBytes:residual->_value.get() length:inputByteSize options:MTLResourceStorageModeShared];
+        } else {
+            bufferResidual = bufferInput;  // Dummy input.
         }
-        return result;
+
+        [computeEncoder setBuffer:bufferParam offset:0 atIndex:0];
+        [computeEncoder setBuffer:bufferResidual offset:0 atIndex:1];
+        [computeEncoder setBuffer:bufferW2 offset:0 atIndex:2];
+        [computeEncoder setBuffer:bufferInterres offset:0 atIndex:3];
+        [computeEncoder setBuffer:bufferOutput offset:0 atIndex:4];
+        
+        gridSize = MTLSizeMake(batch, seqlen, _dim);
+        threadgroupSize = MTLSizeMake(1, 1, 16);
+        [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
+
+        float* tmp = static_cast<float*>(bufferOutput.contents);
+        memcpy(output._value.get(), tmp, inputByteSize);
+        return output;
     }
     
 }

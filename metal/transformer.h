@@ -73,7 +73,7 @@ public:
                 throw std::runtime_error("Fail to load library");
             }
 
-            _kernelFunction = [_library newFunctionWithName:@"FFNSwiGLU_step1"];
+            _kernelFunction = [_library newFunctionWithName:@"FFNSwiGLU_Step1"];
             if (!_kernelFunction) {
                 throw std::runtime_error("Method not found in the library");
             }

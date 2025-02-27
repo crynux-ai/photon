@@ -19,8 +19,10 @@ public:
     }
 
     ~FFNSwiGLU() {
-        [_pipelineState release];
-        [_kernelFunction release];
+        [_state1 release];
+        [_state2 release];
+        [_step1 release];
+        [_step2 release];
         [_library release];
         [_device release];
     }
@@ -51,13 +53,15 @@ public:
                 throw std::runtime_error("Fail to load library");
             }
 
-            _kernelFunction = [_library newFunctionWithName:@"FFNSwiGLU_step1"];
-            if (!_kernelFunction) {
+            _step1 = [_library newFunctionWithName:@"FFNSwiGLU_Step1"];
+            _step2 = [_library newFunctionWithName:@"FFNSwiGLU_Step2"];
+            if (!_step1 || !_step2) {
                 throw std::runtime_error("Method not found in the library");
             }
 
-            _pipelineState = [_device newComputePipelineStateWithFunction:_kernelFunction error:&error];
-            if (!_pipelineState) {
+            _state1 = [_device newComputePipelineStateWithFunction:_step1 error:&error];
+            _state2 = [_device newComputePipelineStateWithFunction:_step2 error:&error];
+            if (!_state1 || !_state2) {
                 throw std::runtime_error("Fail to create pipeline");
             }
         }
@@ -74,7 +78,9 @@ private:
 
     id<MTLDevice> _device;
     id<MTLLibrary> _library;
-    id<MTLFunction> _kernelFunction;
-    id<MTLComputePipelineState> _pipelineState;
+    id<MTLFunction> _step1;
+    id<MTLFunction> _step2;
+    id<MTLComputePipelineState> _state1;
+    id<MTLComputePipelineState> _state2;
 };
 
