@@ -13,10 +13,11 @@ template <>
 class Attention<BackendType::METAL> {
 
 public:
-    Attention(int dim, int num_heads) {
+    Attention(int dim, int num_heads, int max_seq_len) {
         _dim = dim;
         _num_heads = num_heads;
         _head_dim = dim / num_heads;
+        _max_seq_len = max_seq_len;
         assert(dim % num_heads == 0);
     }
 
@@ -82,6 +83,7 @@ private:
     int _dim;
     int _num_heads;
     int _head_dim;
+    int _max_seq_len;
 
     id<MTLDevice> _device;
     id<MTLLibrary> _library;

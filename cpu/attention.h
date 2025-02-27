@@ -12,10 +12,11 @@ template <>
 class Attention<BackendType::CPU> {
 
 public:
-    Attention(int dim, int num_heads) {
+    Attention(int dim, int num_heads, int maxlen) {
         _dim = dim;
         _num_heads = num_heads;
         _head_dim = dim / num_heads;
+        _maxlen = maxlen;
         assert(dim % num_heads == 0);
     }
 
@@ -37,7 +38,7 @@ public:
     }
 
     Tensor forward(
-        const Tensor& input, const std::pair<FreqMatrix, FreqMatrix>& rope,
+        const Tensor& input, const Tensor& rope_cost, const Tensor& rope_sint,
         int start_pos, bool mask, Tensor* residual=nullptr);
 
 private:
@@ -45,10 +46,11 @@ private:
     Tensor _wk;
     Tensor _wv;
     Tensor _wo;
-    std::vector<std::vector<Tensor>> _cachek;
-    std::vector<std::vector<Tensor>> _cachev;
+    Tensor _cachek;
+    Tensor _cachev;
 
     int _dim;
     int _num_heads;
     int _head_dim;
+    int _maxlen;
 };

@@ -10,8 +10,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 file(
     GLOB SRCS
     "engine/*.cc" "engine/*.cpp" "engine/*.h"
+    "include/*.h"
     "schema/*.h" "schema/*.cc"
-    "layers/*.h" "layers/*.cc"
+    "shared/*.h" "shared/*.cc"
 )
 
 if(PLATFORM STREQUAL "METAL")

@@ -2,6 +2,7 @@
 
 #include "include/attention.h"
 #include "include/backend.h"
+#include "include/rope.h"
 #include "include/feedforward.h"
 #include "include/transformer.h"
 #include "schema/loader.h"
@@ -18,10 +19,15 @@ public:
         _args = args;
 
         for (int i = 0; i < args.num_layers; i++) {
-            _attention.push_back(Attention<BackendType::CPU>(args.dim, args.num_heads));
+            _attention.push_back(Attention<BackendType::CPU>(args.dim, args.num_heads, args.max_seq_len));
             _ffn.push_back(FFNSwiGLU<BackendType::CPU>(args.dim, args.dim * 4, args.multiple_of));
         }
-        _rope = precompute_freqs_cis(args.dim / args.num_heads, args.max_seq_len, 10000.0);
+
+        _rope_cost = Tensor({args.max_seq_len, args.dim / args.num_heads / 2});
+        _rope_sint = Tensor({args.max_seq_len, args.dim / args.num_heads / 2});
+        precompute_freqs_cis(
+            args.dim / args.num_heads, args.max_seq_len, 10000.0,
+            &_rope_cost, &_rope_sint);
     }
 
     size_t size() {
@@ -55,7 +61,8 @@ public:
 private:
     std::vector<Attention<BackendType::CPU>> _attention;
     std::vector<FFNSwiGLU<BackendType::CPU>> _ffn;
-    std::pair<FreqMatrix, FreqMatrix> _rope;
+    Tensor _rope_cost;
+    Tensor _rope_sint;
     Tensor _token_embeddings;
     Tensor _wo;
 

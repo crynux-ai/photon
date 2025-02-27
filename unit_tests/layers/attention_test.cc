@@ -17,11 +17,13 @@ TEST(AttentionTest, AttentionTest) {
     int head_dim = loader.ReadInt();
     int maxseqlen = loader.ReadInt();
     float theta = loader.ReadFloat();
-    auto rope = precompute_freqs_cis(head_dim, maxseqlen, theta);
+    Tensor rope_cost({maxseqlen, head_dim / 2});
+    Tensor rope_sint({maxseqlen, head_dim / 2});
+    precompute_freqs_cis(head_dim, maxseqlen, theta, &rope_cost, &rope_sint);
     
     Tensor wq, wk, wv, wo;
     int tensor_size = dim * dim * 4 + 12;
-    Attention<CURRENT_BACKEND> layer(dim, num_head);
+    Attention<CURRENT_BACKEND> layer(dim, num_head, 1000);
     layer.build(loader.Read((dim * dim * 4 + 12) * 4));
 
     Tensor x1, y1, x2, y2, x3, y3, p1, p2, p3;
@@ -32,9 +34,9 @@ TEST(AttentionTest, AttentionTest) {
     x3.build(loader.Read(3*2*256*4 + 16));
     y3.build(loader.Read(3*2*256*4 + 16));
 
-    p1 = layer.forward(x1, rope, 0, true);
-    p2 = layer.forward(x2, rope, 7, true);
-    p3 = layer.forward(x3, rope, 10, false);
+    p1 = layer.forward(x1, rope_cost, rope_sint, 0, true);
+    p2 = layer.forward(x2, rope_cost, rope_sint, 7, true);
+    p3 = layer.forward(x3, rope_cost, rope_sint, 10, false);
     
     EXPECT_EQ(p1.eq(y1, true), true);
     EXPECT_EQ(p2.eq(y2, true), true);

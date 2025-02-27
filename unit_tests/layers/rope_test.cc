@@ -25,31 +25,27 @@ TEST(RopeTest, RopeTest) {
     pk.build(loader.Read(tensor_size));
     int dim = xq.shape()[2];
 
-    std::vector<std::vector<Tensor>> vxq(batch);
-    std::vector<std::vector<Tensor>> vxk(batch);
-
+    Tensor vxq({batch, seqlen, dim});
+    Tensor vxk({batch, startpos + seqlen, dim});
     for (int i = 0; i < batch; i++) {
-        for (int j = 0; j < startpos; j++) {
-            vxk[i].push_back(Tensor({dim}));
-        }
         for (int j = 0; j < seqlen; j++) {
-            vxq[i].push_back(Tensor({dim}));
-            vxk[i].push_back(Tensor({dim}));
             for (int k = 0; k < dim; k++) {
-                vxq[i][j].set(xq(i, j, k), k);
-                vxk[i][j + startpos].set(xk(i, j, k), k);
+                vxq.set(xq(i, j, k), i, j, k);
+                vxk.set(xk(i, j, k), i, j + startpos, k);
             }
         }
     }
 
-    auto freqs_ics = precompute_freqs_cis(head_dim, maxseqlen, 10000.0);
-    apply_rotary_emb(&vxq, &vxk, freqs_ics.first, freqs_ics.second, startpos, seqlen);
+    Tensor cost({maxseqlen, head_dim / 2});
+    Tensor sint({maxseqlen, head_dim / 2});
+    precompute_freqs_cis(head_dim, maxseqlen, 10000.0, &cost, &sint);
+    apply_rotary_emb<CURRENT_BACKEND>(&vxq, &vxk, cost, sint, startpos, seqlen);
 
     for (int i = 0; i < batch; i++) {
         for (int j = 0; j < seqlen; j++) {
             for (int k = 0; k < xq.shape()[2]; k++) {
-                xq.set(vxq[i][j](k), i, j, k);
-                xk.set(vxk[i][startpos + j](k), i, j, k);
+                xq.set(vxq(i, j, k), i, j, k);
+                xk.set(vxk(i, startpos + j, k), i, j, k);
             }
         }
     }

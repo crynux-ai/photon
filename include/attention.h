@@ -17,7 +17,7 @@ public:
     virtual void build(std::string_view content) = 0;
 
     virtual Tensor forward(
-        const Tensor& input, const std::pair<FreqMatrix, FreqMatrix>& rope,
+        const Tensor& input, const Tensor& rope_cost, const Tensor& rope_sint,
         int start_pos, bool mask, Tensor* residual=nullptr) = 0;
 
 protected:

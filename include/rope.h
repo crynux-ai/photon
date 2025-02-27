@@ -1,18 +1,21 @@
 #pragma once
+
+#include "include/backend.h"
 #include "schema/tensor.h"
 
 #include <cmath>
 #include <cassert>
 #include <iostream>
 
-using FreqMatrix = std::vector<std::vector<float>>;
+void precompute_freqs_cis(
+        int head_dim, int max_seqlen, float theta,
+        Tensor* cost, Tensor* sint);
 
-std::pair<FreqMatrix, FreqMatrix> precompute_freqs_cis(int head_dim, int max_seqlen, float theta);
-
+template <BackendType backend>
 void apply_rotary_emb(
-        std::vector<std::vector<Tensor>>* xq,
-        std::vector<std::vector<Tensor>>* cachek,
-        const FreqMatrix& cost,
-        const FreqMatrix& sint,
+        Tensor* xq,
+        Tensor* cachek,
+        const Tensor& cost,
+        const Tensor& sint,
         int start_pos,
         int seqlen);
