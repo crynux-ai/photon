@@ -37,4 +37,12 @@ template <> class Transformer<BackendType::CPU>;
 
 template <> class Transformer<BackendType::METAL>;
 
-#include "cpu/transformer.h"
+#ifdef PHOTON_METAL
+#include "metal/transformer.h"
+#else
+    #ifdef PHOTON_CUDA
+    #else
+        #include "cpu/transformer.h"
+    #endif
+#endif
+
