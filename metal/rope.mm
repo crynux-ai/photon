@@ -75,10 +75,10 @@ void apply_rotary_emb<BackendType::METAL>(
 
         float* ptrk = static_cast<float*>(bufferCachek.contents);
         int batch_cnt = max_seq_len * dim;
-        int batch_byte_size = batch_cnt * sizeof(float);
+        int copy_byte_size = seqlen * dim * sizeof(float);
         int ptr = start_pos * dim;
         for (int b = 0; b < batch; b++, ptr += batch_cnt) {
-            memcpy(cachek->_value.get() + ptr, ptrk + ptr, batch_byte_size);
+            memcpy(cachek->_value.get() + ptr, ptrk + ptr, copy_byte_size);
         }
     }
 }

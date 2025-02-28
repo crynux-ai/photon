@@ -1,7 +1,7 @@
 #pragma once
 
 #include "include/backend.h"
-#include "include/feedforward.h"
+#include "include/attention.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
 
@@ -69,7 +69,7 @@ public:
     }
 
     Tensor forward(
-        const Tensor& input, const std::pair<FreqMatrix, FreqMatrix>& rope,
+        const Tensor& input, const Tensor& cost, const Tensor& sint,
         int start_pos, bool mask, Tensor* residual=nullptr);
 
 private:
@@ -77,8 +77,8 @@ private:
     Tensor _wk;
     Tensor _wv;
     Tensor _wo;
-    std::vector<std::vector<Tensor>> _cachek;
-    std::vector<std::vector<Tensor>> _cachev;
+    Tensor _cachek;
+    Tensor _cachev;
 
     int _dim;
     int _num_heads;

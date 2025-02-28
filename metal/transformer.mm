@@ -44,7 +44,7 @@ Tensor Transformer<BackendType::METAL>::forward(const std::vector<std::vector<in
     for (int l = 0; l < _args.num_layers; l++) {
         // Attention
         auto norm_input = RMSNorm(embeddings, _args.norm_eps);
-        embeddings = _attention[l]->forward(norm_input, _rope, start_pos,
+        embeddings = _attention[l]->forward(norm_input, _rope_cost, _rope_sint, start_pos,
             /*mask=*/seqlen > 1, /*residual=*/&embeddings);
 
         // FFN

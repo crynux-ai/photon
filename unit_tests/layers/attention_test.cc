@@ -23,7 +23,7 @@ TEST(AttentionTest, AttentionTest) {
     
     Tensor wq, wk, wv, wo;
     int tensor_size = dim * dim * 4 + 12;
-    Attention<CURRENT_BACKEND> layer(dim, num_head, 1000);
+    Attention<CURRENT_BACKEND> layer(dim, num_head, maxseqlen);
     layer.build(loader.Read((dim * dim * 4 + 12) * 4));
 
     Tensor x1, y1, x2, y2, x3, y3, p1, p2, p3;

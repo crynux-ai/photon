@@ -1,16 +1,16 @@
-#include "cpu/attention.h"
+#include "metal/attention.h"
 
 #include <cassert>
 
 
 Tensor Attention<BackendType::METAL>::forward(
-        const Tensor& input, const std::pair<FreqMatrix, FreqMatrix>& rope,
+        const Tensor& input, const Tensor& rope_cost, const Tensor& rope_sint,
         int start_pos, bool mask, Tensor* residual) {
     int batch = input.shape()[0];
     int seqlen = input.shape()[1];
-    if (_cachek.empty()) {
-        _cachek.resize(batch);
-        _cachev.resize(batch);
+    if (_cachek.shape().empty()) {
+        _cachek = Tensor({batch, _max_seq_len, _dim});
+        _cachev = Tensor({batch, _max_seq_len, _dim});
     }
 
     @autoreleasepool {
@@ -19,22 +19,22 @@ Tensor Attention<BackendType::METAL>::forward(
         id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
         [computeEncoder setComputePipelineState:_pipelineState];
         
+        // wq(input), wk(input), wv(input)
         size_t inputByteSize = batch * seqlen * _dim * sizeof(float);
         size_t wByteSize = _dim * _dim * sizeof(float);
-        size_t resByteSize = batch * seqlen * _dim * sizeof(float);
-        int params[] = {batch, seqlen, _dim};
+        size_t qByteSize = batch * seqlen * _dim * sizeof(float);
+        size_t cacheByteSize = batch * _max_seq_len * _dim * sizeof(float);
+        int params[] = {batch, seqlen, _max_seq_len, _dim, start_pos};
         Tensor xq({batch, seqlen, _dim});
-        Tensor xk({batch, seqlen, _dim});
-        Tensor xv({batch, seqlen, _dim});
 
-        id<MTLBuffer> bufferParam = [_device newBufferWithBytes:params length:3*sizeof(int) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferParam = [_device newBufferWithBytes:params length:5*sizeof(int) options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferInput = [_device newBufferWithBytes:input._value.get() length:inputByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferWq = [_device newBufferWithBytes:_wq._value.get() length:wByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferWk = [_device newBufferWithBytes:_wk._value.get() length:wByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferWv = [_device newBufferWithBytes:_wv._value.get() length:wByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferXq = [_device newBufferWithBytes:xq._value.get() length:resByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferXk = [_device newBufferWithBytes:xk._value.get() length:resByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferXv = [_device newBufferWithBytes:xv._value.get() length:resByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferXq = [_device newBufferWithBytes:xq._value.get() length:qByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferCachek = [_device newBufferWithBytes:_cachek._value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferCachev = [_device newBufferWithBytes:_cachev._value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
 
         [computeEncoder setBuffer:bufferParam offset:0 atIndex:0];
         [computeEncoder setBuffer:bufferInput offset:0 atIndex:1];
@@ -42,8 +42,8 @@ Tensor Attention<BackendType::METAL>::forward(
         [computeEncoder setBuffer:bufferWk offset:0 atIndex:3];
         [computeEncoder setBuffer:bufferWv offset:0 atIndex:4];
         [computeEncoder setBuffer:bufferXq offset:0 atIndex:5];
-        [computeEncoder setBuffer:bufferXk offset:0 atIndex:6];
-        [computeEncoder setBuffer:bufferXv offset:0 atIndex:7];
+        [computeEncoder setBuffer:bufferCachek offset:0 atIndex:6];
+        [computeEncoder setBuffer:bufferCachev offset:0 atIndex:7];
         
         MTLSize gridSize = MTLSizeMake(batch, seqlen, _dim);
         MTLSize threadgroupSize = MTLSizeMake(1, 1, 16);
@@ -53,23 +53,19 @@ Tensor Attention<BackendType::METAL>::forward(
         [commandBuffer waitUntilCompleted];
 
         float* ptrq = static_cast<float*>(bufferXq.contents);
-        float* ptrk = static_cast<float*>(bufferXk.contents);
-        float* ptrv = static_cast<float*>(bufferXv.contents);
-        std::vector<std::vector<Tensor>> cacheq(batch);
-        for (int b = 0; b < batch; b++) {
-            for (int i = 0; i < seqlen; i++) {
-                _cachek[b].push_back(Tensor({_dim}));
-                _cachev[b].push_back(Tensor({_dim}));
-                cacheq[b].push_back(Tensor({_dim}));
-                for (int j = 0; j < _dim; j++, ptrq++, ptrk++, ptrv++) {
-                    cacheq[b].back().set(*ptrq, j);
-                    _cachek[b].back().set(*ptrk, j);
-                    _cachev[b].back().set(*ptrv, j);
-                }
-            }
+        memcpy(xq._value.get(), ptrq, qByteSize);
+
+        float* ptrk = static_cast<float*>(bufferCachek.contents);
+        float* ptrv = static_cast<float*>(bufferCachev.contents);
+        int batch_cnt = _max_seq_len * _dim;
+        int copy_byte_size = seqlen * _dim * sizeof(float);
+        int ptr = start_pos * _dim;
+        for (int b = 0; b < batch; b++, ptr += batch_cnt) {
+            memcpy(_cachek._value.get() + ptr, ptrk + ptr, copy_byte_size);
+            memcpy(_cachev._value.get() + ptr, ptrv + ptr, copy_byte_size);
         }
-        
-        apply_rotary_emb(&cacheq, &_cachek, rope.first, rope.second, start_pos, seqlen);
+
+        apply_rotary_emb<BackendType::METAL>(&xq, &_cachek, rope_cost, rope_sint, start_pos, seqlen);
 
         int totlen = start_pos + seqlen;
         float scale = std::sqrt(_head_dim);
@@ -95,7 +91,7 @@ Tensor Attention<BackendType::METAL>::forward(
                         int ptrq = h *_head_dim;
                         int ptrk = h * _head_dim;
                         for (int k = 0; k < _head_dim; k++, ptrk++, ptrq++) {
-                            tmp += cacheq[b][i](ptrq) * _cachek[b][j](ptrk);
+                            tmp += xq(b, i, ptrq) * _cachek(b, j, ptrk);
                         }
                         tmp = std::exp(tmp / scale);
                         score[b][h].set(tmp, i, j);
@@ -119,7 +115,7 @@ Tensor Attention<BackendType::METAL>::forward(
                 for (int k = 0; k < totlen; k++) {
                     for (int i = 0; i < seqlen; i++) {
                         for (int j = 0, ptrv=_head_dim*h; j < _head_dim; j++, ptrv++) {
-                            output[b][h].add(score[b][h](i, k) * _cachev[b][k](ptrv), i, j);
+                            output[b][h].add(score[b][h](i, k) * _cachev(b, k, ptrv), i, j);
                         }
                     }
                 }

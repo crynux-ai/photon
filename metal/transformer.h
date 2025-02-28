@@ -20,13 +20,17 @@ public:
         _args = args;
 
         for (int i = 0; i < args.num_layers; i++) {
-            auto att = std::make_unique<Attention<BackendType::METAL>>(args.dim, args.num_heads);
+            auto att = std::make_unique<Attention<BackendType::METAL>>(args.dim, args.num_heads, args.max_seq_len);
             auto ffn = std::make_unique<FFNSwiGLU<BackendType::METAL>>(args.dim, args.dim * 4, args.multiple_of);
 
             _attention.push_back(std::move(att));
             _ffn.push_back(std::move(ffn));
         }
-        _rope = precompute_freqs_cis(args.dim / args.num_heads, args.max_seq_len, 10000.0);
+        _rope_cost = Tensor({args.max_seq_len, args.dim / args.num_heads / 2});
+        _rope_sint = Tensor({args.max_seq_len, args.dim / args.num_heads / 2});
+        precompute_freqs_cis(
+            args.dim / args.num_heads, args.max_seq_len, 10000.0,
+            &_rope_cost, &_rope_sint);
     }
 
     ~Transformer() {
@@ -90,7 +94,8 @@ public:
 private:
     std::vector<std::unique_ptr<Attention<BackendType::METAL>>> _attention;
     std::vector<std::unique_ptr<FFNSwiGLU<BackendType::METAL>>> _ffn;
-    std::pair<FreqMatrix, FreqMatrix> _rope;
+    Tensor _rope_cost;
+    Tensor _rope_sint;
     Tensor _token_embeddings;
     Tensor _wo;
 

@@ -4,18 +4,20 @@ using namespace metal;
 
 kernel void Attention_Step1(
     constant int *params           [[ buffer(0) ]],
-    const device float *input      [[ buffer(1) ]],
-    const device float *wq         [[ buffer(2) ]],
-    const device float *wk         [[ buffer(3) ]],
-    const device float *wv         [[ buffer(4) ]],
-    device float *xq               [[ buffer(5) ]],
-    device float *xk               [[ buffer(6) ]],
-    device float *xv               [[ buffer(7) ]],
+    const device float *input      [[ buffer(1) ]],     // [batch, seqlen, dim]
+    const device float *wq         [[ buffer(2) ]],     // [dim, dim]
+    const device float *wk         [[ buffer(3) ]],     // [dim, dim]
+    const device float *wv         [[ buffer(4) ]],     // [dim, dim]
+    device float *xq               [[ buffer(5) ]],     // [batch, seqlen, dim]
+    device float *cachek           [[ buffer(6) ]],     // [batch, max_seq_len, dim]
+    device float *cachev           [[ buffer(7) ]],     // [batch, max_seq_len, dim]
     uint3 gid                      [[ thread_position_in_grid ]])
 {
     uint batch = params[0];
     uint seqlen = params[1];
-    uint dim = params[2];
+    uint max_seq_len = params[2];
+    uint dim = params[3];
+    uint startpos = params[4];
 
     uint b = gid.x;
     uint i = gid.y;
@@ -30,7 +32,6 @@ kernel void Attention_Step1(
 
     uint base = (b * seqlen + i) * dim;
     uint input_ptr = base;
-    uint res_ptr = base + j;
     uint w_ptr = j * dim;
     for (uint k = 0; k < dim; k++, input_ptr++, w_ptr++) {
         valq += input[input_ptr] * wq[w_ptr];
@@ -38,7 +39,10 @@ kernel void Attention_Step1(
         valv += input[input_ptr] * wv[w_ptr];
     }
 
+    uint res_ptr = base + j;
     xq[res_ptr] = valq;
-    xk[res_ptr] = valk;
-    xv[res_ptr] = valv;
+
+    res_ptr = (b * max_seq_len + i + startpos) * dim + j;
+    cachek[res_ptr] = valk;
+    cachev[res_ptr] = valv;
 }
