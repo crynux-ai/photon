@@ -26,7 +26,7 @@ TEST(RopeTest, RopeTest) {
     int dim = xq.shape()[2];
 
     Tensor vxq({batch, seqlen, dim});
-    Tensor vxk({batch, startpos + seqlen, dim});
+    Tensor vxk({batch, maxseqlen, dim});
     for (int i = 0; i < batch; i++) {
         for (int j = 0; j < seqlen; j++) {
             for (int k = 0; k < dim; k++) {
@@ -50,8 +50,8 @@ TEST(RopeTest, RopeTest) {
         }
     }
 
-    EXPECT_EQ(xq.eq(pq), true);
-    EXPECT_EQ(xk.eq(pk), true);
+    EXPECT_EQ(xq.eq(pq, true), true);
+    EXPECT_EQ(xk.eq(pk, true), true);
 }
 
 int main(int argc, char **argv) {
