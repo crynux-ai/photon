@@ -91,13 +91,14 @@ Tensor Attention<BackendType::METAL>::forward(
             memcpy(_cachev._value.get() + ptr, ptrv + ptr, copy_byte_size);
         }
 
+        // softmax(QK^T/scale))
         int totlen = start_pos + seqlen;
         float scale = std::sqrt(_head_dim);
-        std::vector<std::vector<Tensor>> score(batch);
+        Tensor score({batch, seqlen, totlen, _num_heads});
+        score.zero();
+
         for (int b = 0; b < batch; b++) {
             for (int h = 0; h < _num_heads; h++) {
-                score[b].push_back(Tensor({seqlen, totlen}));
-                score[b].back().zero();
                 int fill = totlen;
                 if (mask) {
                     fill = start_pos;
@@ -118,29 +119,26 @@ Tensor Attention<BackendType::METAL>::forward(
                             tmp += xq(b, i, ptrq) * _cachek(b, j, ptrk);
                         }
                         tmp = std::exp(tmp / scale);
-                        score[b][h].set(tmp, i, j);
+                        score.set(tmp, b, i, j, h);
                         sum += tmp;
                     }
                     for (int j = fill; j < totlen; j++) {
-                        score[b][h].set(0, i, j);
+                        score.set(0, b, i, j, h);
                     }
                     for (int j = 0; j < fill; j++) {
-                        score[b][h].set(score[b][h](i, j) / sum, i, j);
+                        score.set(score(b, i, j, h) / sum, b, i, j, h);
                     }
                 }
             }
         }
 
-        std::vector<std::vector<Tensor>> output(batch);
+        Tensor output({batch, seqlen, _dim});
+        output.zero();
         for (int b = 0; b < batch; b++) {
-            for (int h = 0; h < _num_heads; h++) {
-                output[b].push_back(Tensor({seqlen, _head_dim}));
-                output[b].back().zero();
-                for (int k = 0; k < totlen; k++) {
-                    for (int i = 0; i < seqlen; i++) {
-                        for (int j = 0, ptrv=_head_dim*h; j < _head_dim; j++, ptrv++) {
-                            output[b][h].add(score[b][h](i, k) * _cachev(b, k, ptrv), i, j);
-                        }
+            for (int i = 0; i < seqlen; i++) {
+                for (int j = 0; j < _dim; j++) {
+                    for (int k = 0; k < totlen; k++) {
+                        output.add(score(b, i, k, j / _head_dim) * _cachev(b, k, j), b, i, j);
                     }
                 }
             }
@@ -151,11 +149,8 @@ Tensor Attention<BackendType::METAL>::forward(
         for (int b = 0; b < batch; b++) {
             for (int l = 0;  l < seqlen; l++) {
                 for (int i = 0; i < _dim; i++) {
-                    int ptr = 0;
-                    for (int h = 0; h < _num_heads; h++) {
-                        for (int j = 0; j < _head_dim; j++, ptr++) {
-                            result.add(_wo(i, ptr) * output[b][h](l, j), b, l, i);
-                        }
+                    for (int j = 0; j < _dim; j++) {
+                        result.add(_wo(i, j) * output(b, l, j), b, l, i);
                     }
                     if (residual) {
                         result.add((*residual)(b, l, i), b, l, i);
