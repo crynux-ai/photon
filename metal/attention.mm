@@ -8,6 +8,7 @@ Tensor Attention<BackendType::METAL>::forward(
         int start_pos, bool mask, Tensor* residual) {
     int batch = input.shape()[0];
     int seqlen = input.shape()[1];
+    int num_complex = rope_cost.shape()[1];
     if (_cachek.shape().empty()) {
         _cachek = Tensor({batch, _max_seq_len, _dim});
         _cachev = Tensor({batch, _max_seq_len, _dim});
@@ -17,7 +18,7 @@ Tensor Attention<BackendType::METAL>::forward(
         id<MTLCommandQueue> commandQueue = [_device newCommandQueue];
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
         id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-        [computeEncoder setComputePipelineState:_pipelineState];
+        [computeEncoder setComputePipelineState:_state1];
         
         // wq(input), wk(input), wv(input)
         size_t inputByteSize = batch * seqlen * _dim * sizeof(float);
@@ -52,9 +53,34 @@ Tensor Attention<BackendType::METAL>::forward(
         [commandBuffer commit];
         [commandBuffer waitUntilCompleted];
 
+        // Rope apply_rotary_emb
+        commandQueue = [_device newCommandQueue];
+        commandBuffer = [commandQueue commandBuffer];
+        computeEncoder = [commandBuffer computeCommandEncoder];
+        [computeEncoder setComputePipelineState:_state2];
+
+        size_t ropeByteSize = _max_seq_len * num_complex * sizeof(float);
+        size_t xqByteSize = batch * seqlen * _dim * sizeof(float);
+        int rope_params[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, num_complex};
+        bufferParam = [_device newBufferWithBytes:rope_params length:7*sizeof(float) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferCost = [_device newBufferWithBytes:rope_cost._value.get() length:ropeByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferSint = [_device newBufferWithBytes:rope_sint._value.get() length:ropeByteSize options:MTLResourceStorageModeShared];
+
+        [computeEncoder setBuffer:bufferParam offset:0 atIndex:0];
+        [computeEncoder setBuffer:bufferCost offset:0 atIndex:1];
+        [computeEncoder setBuffer:bufferSint offset:0 atIndex:2];
+        [computeEncoder setBuffer:bufferXq offset:0 atIndex:3];
+        [computeEncoder setBuffer:bufferCachek offset:0 atIndex:4];
+
+        gridSize = MTLSizeMake(batch, seqlen, _dim / 2);
+        threadgroupSize = MTLSizeMake(1, 1, 16);
+        [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
+
         float* ptrq = static_cast<float*>(bufferXq.contents);
         memcpy(xq._value.get(), ptrq, qByteSize);
-
         float* ptrk = static_cast<float*>(bufferCachek.contents);
         float* ptrv = static_cast<float*>(bufferCachev.contents);
         int batch_cnt = _max_seq_len * _dim;
@@ -64,8 +90,6 @@ Tensor Attention<BackendType::METAL>::forward(
             memcpy(_cachek._value.get() + ptr, ptrk + ptr, copy_byte_size);
             memcpy(_cachev._value.get() + ptr, ptrv + ptr, copy_byte_size);
         }
-
-        apply_rotary_emb<BackendType::METAL>(&xq, &_cachek, rope_cost, rope_sint, start_pos, seqlen);
 
         int totlen = start_pos + seqlen;
         float scale = std::sqrt(_head_dim);
