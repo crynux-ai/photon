@@ -95,3 +95,46 @@ kernel void Attention_ComputeScore(
     } 
     score[ptr] = exp(tmp / scale);
 }
+
+kernel void Attention_Output(
+    constant int *params           [[ buffer(0) ]],
+    const device float *score      [[ buffer(1) ]],     // [batch, seqlen, max_seq_len, num_head]
+    const device float *cachev     [[ buffer(2) ]],     // [batch, max_seq_len, dim]
+    device float *output           [[ buffer(3) ]],     // [batch, seqlen, dim]
+    uint3 gid                      [[ thread_position_in_grid ]])
+{
+    uint batch = params[0];
+    uint max_seq_len = params[1];
+    uint seqlen = params[2];
+    uint startpos = params[3];
+    uint dim = params[4];
+    uint num_heads = params[5];
+    uint head_dim = dim / num_heads;
+    uint mask = params[6];
+    uint totlen = seqlen + startpos;
+
+    uint b = gid.x;
+    uint i = gid.y;
+    uint j = gid.z;
+    if (b >= batch || i >= seqlen || j >= dim) {
+        return;
+    }
+    uint h = j / head_dim;
+
+
+    uint base = (b * seqlen + i) * max_seq_len * num_heads + h;
+    uint ptrscore = base;
+    float sum = 0;
+
+    for (int k = 0; k < totlen; k++, ptrscore += num_heads) {
+        sum += score[ptrscore];
+    }
+
+    ptrscore = base;
+    float res = 0;
+    uint ptrv = b * max_seq_len * dim + j;
+    for (int k = 0; k < totlen; k++, ptrscore += num_heads, ptrv += dim) {
+        res += score[ptrscore] * cachev[ptrv];
+    }
+    output[(b * seqlen + i) * dim + j] = res / sum;
+}

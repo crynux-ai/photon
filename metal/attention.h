@@ -25,9 +25,13 @@ public:
         [_state1 release];
         [_state2 release];
         [_state3 release];
+        [_state4 release];
         [_step1 release];
         [_step2 release];
         [_step3 release];
+        [_step4 release];
+        [_bufferCachek release];
+        [_bufferCachev release];
         [_library release];
         [_device release];
     }
@@ -63,14 +67,16 @@ public:
             _step1 = [_library newFunctionWithName:@"Attention_Step1"];
             _step2 = [_library newFunctionWithName:@"Rope_apply_rotary_emb"];
             _step3 = [_library newFunctionWithName:@"Attention_ComputeScore"];
-            if (!_step1 || !_step2 || !_step3) {
+            _step4 = [_library newFunctionWithName:@"Attention_Output"];
+            if (!_step1 || !_step2 || !_step3 || !_step4) {
                 throw std::runtime_error("Method not found in the library");
             }
 
             _state1 = [_device newComputePipelineStateWithFunction:_step1 error:&error];
             _state2 = [_device newComputePipelineStateWithFunction:_step2 error:&error];
             _state3 = [_device newComputePipelineStateWithFunction:_step3 error:&error];
-            if (!_state1 || !_state2 || !_state3) {
+            _state4 = [_device newComputePipelineStateWithFunction:_step4 error:&error];
+            if (!_state1 || !_state2 || !_state3 || !_state4) {
                 throw std::runtime_error("Fail to create pipeline");
             }
         }
@@ -98,8 +104,13 @@ private:
     id<MTLFunction> _step1;
     id<MTLFunction> _step2;
     id<MTLFunction> _step3;
+    id<MTLFunction> _step4;
     id<MTLComputePipelineState> _state1;
     id<MTLComputePipelineState> _state2;
     id<MTLComputePipelineState> _state3;
+    id<MTLComputePipelineState> _state4;
+
+    id<MTLBuffer> _bufferCachev;
+    id<MTLBuffer> _bufferCachek;
 
 };

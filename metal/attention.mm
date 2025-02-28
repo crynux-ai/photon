@@ -9,33 +9,32 @@ Tensor Attention<BackendType::METAL>::forward(
     int batch = input.shape()[0];
     int seqlen = input.shape()[1];
     int num_complex = rope_cost.shape()[1];
+    size_t inputByteSize = batch * seqlen * _dim * sizeof(float);
+    size_t wByteSize = _dim * _dim * sizeof(float);
+    size_t qByteSize = batch * seqlen * _dim * sizeof(float);
+    size_t cacheByteSize = batch * _max_seq_len * _dim * sizeof(float);
     if (_cachek.shape().empty()) {
         _cachek = Tensor({batch, _max_seq_len, _dim});
         _cachev = Tensor({batch, _max_seq_len, _dim});
+        _bufferCachek = [_device newBufferWithBytes:_cachek._value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
+        _bufferCachev = [_device newBufferWithBytes:_cachev._value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
     }
 
     @autoreleasepool {
+        // wq(input), wk(input), wv(input)
         id<MTLCommandQueue> commandQueue = [_device newCommandQueue];
         id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
         id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
         [computeEncoder setComputePipelineState:_state1];
-        
-        // wq(input), wk(input), wv(input)
-        size_t inputByteSize = batch * seqlen * _dim * sizeof(float);
-        size_t wByteSize = _dim * _dim * sizeof(float);
-        size_t qByteSize = batch * seqlen * _dim * sizeof(float);
-        size_t cacheByteSize = batch * _max_seq_len * _dim * sizeof(float);
+
         int params[] = {batch, seqlen, _max_seq_len, _dim, start_pos};
         Tensor xq({batch, seqlen, _dim});
-
         id<MTLBuffer> bufferParam = [_device newBufferWithBytes:params length:5*sizeof(int) options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferInput = [_device newBufferWithBytes:input._value.get() length:inputByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferWq = [_device newBufferWithBytes:_wq._value.get() length:wByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferWk = [_device newBufferWithBytes:_wk._value.get() length:wByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferWv = [_device newBufferWithBytes:_wv._value.get() length:wByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferXq = [_device newBufferWithBytes:xq._value.get() length:qByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferCachek = [_device newBufferWithBytes:_cachek._value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferCachev = [_device newBufferWithBytes:_cachev._value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
 
         [computeEncoder setBuffer:bufferParam offset:0 atIndex:0];
         [computeEncoder setBuffer:bufferInput offset:0 atIndex:1];
@@ -43,8 +42,8 @@ Tensor Attention<BackendType::METAL>::forward(
         [computeEncoder setBuffer:bufferWk offset:0 atIndex:3];
         [computeEncoder setBuffer:bufferWv offset:0 atIndex:4];
         [computeEncoder setBuffer:bufferXq offset:0 atIndex:5];
-        [computeEncoder setBuffer:bufferCachek offset:0 atIndex:6];
-        [computeEncoder setBuffer:bufferCachev offset:0 atIndex:7];
+        [computeEncoder setBuffer:_bufferCachek offset:0 atIndex:6];
+        [computeEncoder setBuffer:_bufferCachev offset:0 atIndex:7];
         
         MTLSize gridSize = MTLSizeMake(batch, seqlen, _dim);
         MTLSize threadgroupSize = MTLSizeMake(1, 1, 16);
@@ -70,7 +69,7 @@ Tensor Attention<BackendType::METAL>::forward(
         [computeEncoder setBuffer:bufferCost offset:0 atIndex:1];
         [computeEncoder setBuffer:bufferSint offset:0 atIndex:2];
         [computeEncoder setBuffer:bufferXq offset:0 atIndex:3];
-        [computeEncoder setBuffer:bufferCachek offset:0 atIndex:4];
+        [computeEncoder setBuffer:_bufferCachek offset:0 atIndex:4];
 
         gridSize = MTLSizeMake(batch, seqlen, _dim / 2);
         threadgroupSize = MTLSizeMake(1, 1, 16);
@@ -78,10 +77,6 @@ Tensor Attention<BackendType::METAL>::forward(
         [computeEncoder endEncoding];
         [commandBuffer commit];
         [commandBuffer waitUntilCompleted];
-
-        int batch_cnt = _max_seq_len * _dim;
-        int copy_byte_size = seqlen * _dim * sizeof(float);
-        int ptr = start_pos * _dim;
 
 
         // softmax(QK^T/scale)) (not averaged)
@@ -102,45 +97,41 @@ Tensor Attention<BackendType::METAL>::forward(
 
         [computeEncoder setBuffer:bufferParamScore offset:0 atIndex:0];
         [computeEncoder setBuffer:bufferXq offset:0 atIndex:1];
-        [computeEncoder setBuffer:bufferCachek offset:0 atIndex:2];
-        [computeEncoder setBuffer:bufferCachev offset:0 atIndex:3];
+        [computeEncoder setBuffer:_bufferCachek offset:0 atIndex:2];
+        [computeEncoder setBuffer:_bufferCachev offset:0 atIndex:3];
         [computeEncoder setBuffer:bufferScore offset:0 atIndex:4];
 
         gridSize = MTLSizeMake(batch, seqlen, totlen * _num_heads);
-        threadgroupSize = MTLSizeMake(1, 1, 16);
+        threadgroupSize = MTLSizeMake(1, 1, 1);
         [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
         [computeEncoder endEncoding];
         [commandBuffer commit];
         [commandBuffer waitUntilCompleted];
 
-        float* ptrs = static_cast<float*>(bufferScore.contents);
-        memcpy(score._value.get(), ptrs, batch * seqlen * _max_seq_len * _num_heads * sizeof(float));
-
 
         // score @ cachev
-        float* ptrq = static_cast<float*>(bufferXq.contents);
-        memcpy(xq._value.get(), ptrq, qByteSize);
-        float* ptrk = static_cast<float*>(bufferCachek.contents);
-        float* ptrv = static_cast<float*>(bufferCachev.contents);
-        for (int b = 0; b < batch; b++, ptr += batch_cnt) {
-            memcpy(_cachek._value.get() + ptr, ptrk + ptr, copy_byte_size);
-            memcpy(_cachev._value.get() + ptr, ptrv + ptr, copy_byte_size);
-        }
+        commandQueue = [_device newCommandQueue];
+        commandBuffer = [commandQueue commandBuffer];
+        computeEncoder = [commandBuffer computeCommandEncoder];
+        [computeEncoder setComputePipelineState:_state4];
 
-        output.zero();
-        for (int b = 0; b < batch; b++) {
-            for (int i = 0; i < seqlen; i++) {
-                for (int j = 0; j < _dim; j++) {
-                    float sum = 0;
-                    for (int k = 0; k < totlen; k++) {
-                        sum += score(b, i, k, j / _head_dim);
-                    }
-                    for (int k = 0; k < totlen; k++) {
-                        output.add(score(b, i, k, j / _head_dim) / sum * _cachev(b, k, j), b, i, j);
-                    }
-                }
-            }
-        }
+        id<MTLBuffer> bufferOutput = [_device newBufferWithBytes:output._value.get() length:inputByteSize options:MTLResourceStorageModeShared];
+
+        [computeEncoder setBuffer:bufferParamScore offset:0 atIndex:0];
+        [computeEncoder setBuffer:bufferScore offset:0 atIndex:1];
+        [computeEncoder setBuffer:_bufferCachev offset:0 atIndex:2];
+        [computeEncoder setBuffer:bufferOutput offset:0 atIndex:3];        
+
+
+        gridSize = MTLSizeMake(batch, seqlen, _dim);
+        threadgroupSize = MTLSizeMake(1, 1, 4);
+        [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
+
+        float* ptrs = static_cast<float*>(bufferOutput.contents);
+        memcpy(output._value.get(), ptrs, batch * seqlen * _dim * sizeof(float));
 
         Tensor result({batch, seqlen, _dim});
         result.zero();
