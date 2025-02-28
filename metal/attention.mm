@@ -79,66 +79,64 @@ Tensor Attention<BackendType::METAL>::forward(
         [commandBuffer commit];
         [commandBuffer waitUntilCompleted];
 
+        int batch_cnt = _max_seq_len * _dim;
+        int copy_byte_size = seqlen * _dim * sizeof(float);
+        int ptr = start_pos * _dim;
+
+
+        // softmax(QK^T/scale)) (not averaged)
+        int totlen = start_pos + seqlen;
+        float scale = std::sqrt(_head_dim);
+        int scoreByteSize = batch * seqlen * _max_seq_len * _num_heads * sizeof(float);
+        Tensor score({batch, seqlen, _max_seq_len, _num_heads});
+        Tensor output({batch, seqlen, _dim});
+
+        commandQueue = [_device newCommandQueue];
+        commandBuffer = [commandQueue commandBuffer];
+        computeEncoder = [commandBuffer computeCommandEncoder];
+        [computeEncoder setComputePipelineState:_state3];
+
+        int compute_score_param[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, mask ? 1 : 0};
+        id<MTLBuffer> bufferParamScore = [_device newBufferWithBytes:compute_score_param length:7*sizeof(float) options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferScore = [_device newBufferWithBytes:score._value.get() length:scoreByteSize options:MTLResourceStorageModeShared];
+
+        [computeEncoder setBuffer:bufferParamScore offset:0 atIndex:0];
+        [computeEncoder setBuffer:bufferXq offset:0 atIndex:1];
+        [computeEncoder setBuffer:bufferCachek offset:0 atIndex:2];
+        [computeEncoder setBuffer:bufferCachev offset:0 atIndex:3];
+        [computeEncoder setBuffer:bufferScore offset:0 atIndex:4];
+
+        gridSize = MTLSizeMake(batch, seqlen, totlen * _num_heads);
+        threadgroupSize = MTLSizeMake(1, 1, 16);
+        [computeEncoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
+
+        float* ptrs = static_cast<float*>(bufferScore.contents);
+        memcpy(score._value.get(), ptrs, batch * seqlen * _max_seq_len * _num_heads * sizeof(float));
+
+
+        // score @ cachev
         float* ptrq = static_cast<float*>(bufferXq.contents);
         memcpy(xq._value.get(), ptrq, qByteSize);
         float* ptrk = static_cast<float*>(bufferCachek.contents);
         float* ptrv = static_cast<float*>(bufferCachev.contents);
-        int batch_cnt = _max_seq_len * _dim;
-        int copy_byte_size = seqlen * _dim * sizeof(float);
-        int ptr = start_pos * _dim;
         for (int b = 0; b < batch; b++, ptr += batch_cnt) {
             memcpy(_cachek._value.get() + ptr, ptrk + ptr, copy_byte_size);
             memcpy(_cachev._value.get() + ptr, ptrv + ptr, copy_byte_size);
         }
 
-        // softmax(QK^T/scale))
-        int totlen = start_pos + seqlen;
-        float scale = std::sqrt(_head_dim);
-        Tensor score({batch, seqlen, totlen, _num_heads});
-        score.zero();
-
-        for (int b = 0; b < batch; b++) {
-            for (int h = 0; h < _num_heads; h++) {
-                int fill = totlen;
-                if (mask) {
-                    fill = start_pos;
-                }
-                for (int i = 0;  i < seqlen; i++) {
-                    if (mask) {
-                        fill++;
-                        if (fill > totlen) {
-                            fill = totlen;
-                        }
-                    }
-                    float sum = 0;
-                    for (int j = 0; j < fill; j++) {
-                        float tmp = 0;
-                        int ptrq = h *_head_dim;
-                        int ptrk = h * _head_dim;
-                        for (int k = 0; k < _head_dim; k++, ptrk++, ptrq++) {
-                            tmp += xq(b, i, ptrq) * _cachek(b, j, ptrk);
-                        }
-                        tmp = std::exp(tmp / scale);
-                        score.set(tmp, b, i, j, h);
-                        sum += tmp;
-                    }
-                    for (int j = fill; j < totlen; j++) {
-                        score.set(0, b, i, j, h);
-                    }
-                    for (int j = 0; j < fill; j++) {
-                        score.set(score(b, i, j, h) / sum, b, i, j, h);
-                    }
-                }
-            }
-        }
-
-        Tensor output({batch, seqlen, _dim});
         output.zero();
         for (int b = 0; b < batch; b++) {
             for (int i = 0; i < seqlen; i++) {
                 for (int j = 0; j < _dim; j++) {
+                    float sum = 0;
                     for (int k = 0; k < totlen; k++) {
-                        output.add(score(b, i, k, j / _head_dim) * _cachev(b, k, j), b, i, j);
+                        sum += score(b, i, k, j / _head_dim);
+                    }
+                    for (int k = 0; k < totlen; k++) {
+                        output.add(score(b, i, k, j / _head_dim) / sum * _cachev(b, k, j), b, i, j);
                     }
                 }
             }
