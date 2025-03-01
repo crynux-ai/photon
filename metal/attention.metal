@@ -138,3 +138,42 @@ kernel void Attention_Output(
     }
     output[(b * seqlen + i) * dim + j] = res / sum;
 }
+
+kernel void Attention_Result(
+    constant int *params           [[ buffer(0) ]],
+    const device float *output     [[ buffer(1) ]],     // [batch, seqlen, dim]
+    const device float *wo         [[ buffer(2) ]],     // [batch, dim, dim]
+    const device float *residual   [[ buffer(3) ]],     // [batch, seqlen, dim]
+    device float *result           [[ buffer(4) ]],     // [batch, seqlen, dim]
+    uint3 gid                      [[ thread_position_in_grid ]])
+{
+    uint batch = params[0];
+    uint max_seq_len = params[1];
+    uint seqlen = params[2];
+    uint startpos = params[3];
+    uint dim = params[4];
+    uint num_heads = params[5];
+    uint add_residual = params[6];
+
+    uint b = gid.x;
+    uint i = gid.y;
+    uint j = gid.z;
+    if (b >= batch || i >= seqlen || j >= dim) {
+        return;
+    }
+    
+    float tmp = 0;
+    int ptrw = j * dim;
+    int ptr = (b * seqlen + i) * dim;
+    int ptro = ptr;
+    for (int k = 0; k < dim; k++, ptrw++, ptro++) {
+        tmp += wo[ptrw] * output[ptro];
+    }
+
+    ptr += j;
+    if (add_residual > 0) {
+        tmp += residual[ptr];
+    }
+    result[ptr] = tmp;
+}
+
