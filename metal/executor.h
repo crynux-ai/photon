@@ -44,6 +44,7 @@ public:
             }
         }
 
+        [_command_queue release];
         [_library release];
         [_device release];
     }
@@ -72,12 +73,12 @@ public:
                     throw std::runtime_error("Fail to create pipeline");
                 }
             }
+            _command_queue = [_device newCommandQueue];
         }
     }
 
     void forward(int obj_id, int func, std::vector<int> command_args, std::array<int, 3> grid_size) {
         @autoreleasepool {
-            _command_queue = [_device newCommandQueue];
             _command_buffer = [_command_queue commandBuffer];
             id<MTLComputeCommandEncoder> encoder = [_command_buffer computeCommandEncoder];
             [encoder setComputePipelineState:_states[func]];
