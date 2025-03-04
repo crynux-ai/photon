@@ -11,9 +11,10 @@ template <>
 class FFNSwiGLU<BackendType::CPU> {
 
 public:
-    FFNSwiGLU(int dim, int hidden_dim, int multiple_of) {
+    FFNSwiGLU(int dim, int hidden_dim, int multiple_of, std::shared_ptr<Executor<BackendType::CPU>> executor) {
         _dim = dim;
         _hidden_dim = multiple_of * ((2 * hidden_dim / 3 + multiple_of - 1) / multiple_of);
+        _executor = executor;
     }
 
     size_t size() {
@@ -34,6 +35,7 @@ public:
     Tensor forward(const Tensor& input, Tensor* residual=nullptr);
 
 private:
+    std::shared_ptr<Executor<BackendType::CPU>> _executor;
     Tensor _w1;
     Tensor _w2;
     Tensor _w3;

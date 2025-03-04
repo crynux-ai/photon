@@ -21,7 +21,7 @@ public:
 
         for (int i = 0; i < args.num_layers; i++) {
             _attention.push_back(Attention<BackendType::CPU>(args.dim, args.num_heads, args.max_seq_len, executor));
-            _ffn.push_back(FFNSwiGLU<BackendType::CPU>(args.dim, args.dim * 4, args.multiple_of));
+            _ffn.push_back(FFNSwiGLU<BackendType::CPU>(args.dim, args.dim * 4, args.multiple_of, executor));
         }
 
         _rope_cost = Tensor({args.max_seq_len, args.dim / args.num_heads / 2});
