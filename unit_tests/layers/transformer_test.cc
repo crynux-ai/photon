@@ -42,16 +42,16 @@ TEST(Transformer, TransformerTest) {
     Transformer<CURRENT_BACKEND> layer(args, executor);
     layer.build(loader.Read(layer.size()));
     
-    std::vector<std::vector<std::vector<int>>> inputs;
+    std::vector<std::unique_ptr<Tensor>> inputs;
     std::vector<Tensor> outputs;
     for (int i = 0; i < num_cases; i++) {
-        std::vector<std::vector<int>> tokens(shapes[i].first);
+        std::unique_ptr<Tensor> tokens = std::make_unique<Tensor>(std::vector{shapes[i].first, shapes[i].second});
         for (int j = 0; j < shapes[i].first; j++) {
             for (int k = 0; k < shapes[i].second; k++) {
-                tokens[j].push_back(loader.ReadInt());
+                tokens->set(float(loader.ReadInt()), j, k);
             }
         }
-        inputs.push_back(tokens);
+        inputs.push_back(std::move(tokens));
 
         Tensor output;
         output.build(loader.Read(shapes[i].first * shapes[i].second * 4 * vocab_size + 16));
@@ -61,13 +61,13 @@ TEST(Transformer, TransformerTest) {
     int start_pos = 0;
     for (int i = 0; i < num_cases; i++) {
         auto start = high_resolution_clock::now();
-        Tensor result = layer.forward(inputs[i], start_pos);
+        Tensor result = layer.forward(*inputs[i], start_pos);
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << "Time: " << duration.count() << " microseconds" << std::endl;
 
-        start_pos += inputs[i][0].size();
-        EXPECT_EQ(result.eq(outputs[i]), true);
+        start_pos += inputs[i]->shape()[1];
+        EXPECT_EQ(result.eq(outputs[i], true), true);
     }
 }
 

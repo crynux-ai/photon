@@ -14,11 +14,14 @@
 template <>
 class Transformer<BackendType::METAL> {
 
+int obj_id;
+
 public:
     Transformer(const ModelArgs& args, std::shared_ptr<Executor<BackendType::METAL>> executor) {
         assert(args.dim % args.num_heads == 0);
         _args = args;
         _executor = executor;
+        obj_id = executor->nextLayerId();
 
         for (int i = 0; i < args.num_layers; i++) {
             auto att = std::make_unique<Attention<BackendType::METAL>>(
@@ -36,12 +39,7 @@ public:
             &_rope_cost, &_rope_sint);
     }
 
-    ~Transformer() {
-        [_pipelineState release];
-        [_kernelFunction release];
-        [_library release];
-        [_device release];
-    }
+    ~Transformer() {}
 
     size_t size() {
         auto attention_size = _attention[0]->size();
@@ -63,36 +61,17 @@ public:
             ptr += ffn_size;
         }
 
-        auto emb_size = _args.vocab_size * _args.dim * 4 + 12;
-        _token_embeddings.build({ptr, static_cast<size_t>(emb_size)});
+        size_t emb_size = _args.vocab_size * _args.dim * 4 + 12;
+        _token_embeddings.build({ptr, emb_size});
         ptr += emb_size;
-        _wo.build({ptr, static_cast<size_t>(emb_size)});
+        _wo.build({ptr, emb_size});
 
-        @autoreleasepool {
-            NSError* error;
-            _device = MTLCreateSystemDefaultDevice();
-            if (!_device) {
-                throw std::runtime_error("Metal is not supported");
-            }
-            NSString *libPath = [[NSBundle mainBundle] pathForResource:@"photon" ofType:@"metallib"];
-            _library = [_device newLibraryWithFile:libPath error:&error];
-            if (!_library) {
-                throw std::runtime_error("Fail to load library");
-            }
-
-            _kernelFunction = [_library newFunctionWithName:@"FFNSwiGLU_Step1"];
-            if (!_kernelFunction) {
-                throw std::runtime_error("Method not found in the library");
-            }
-
-            _pipelineState = [_device newComputePipelineStateWithFunction:_kernelFunction error:&error];
-            if (!_pipelineState) {
-                throw std::runtime_error("Fail to create pipeline");
-            }
-        }
+        emb_size = _args.vocab_size * _args.dim * sizeof(float);
+        _executor->addBuffer(obj_id, Transformer_EMBEDDING_TABLE, _token_embeddings._value.get(), emb_size);
+        _executor->addBuffer(obj_id, Transformer_WEIGHT_O, _wo._value.get(), emb_size);
     }
 
-    Tensor forward(const std::vector<std::vector<int>>& input, int start_pos);
+    Tensor forward(const Tensor& input, int start_pos);
 
 private:
     std::shared_ptr<Executor<BackendType::METAL>> _executor;
@@ -104,9 +83,4 @@ private:
     Tensor _wo;
 
     ModelArgs _args;
-
-    id<MTLDevice> _device;
-    id<MTLLibrary> _library;
-    id<MTLFunction> _kernelFunction;
-    id<MTLComputePipelineState> _pipelineState;
 };

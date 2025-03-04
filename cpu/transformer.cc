@@ -4,15 +4,15 @@
 
 #include <cassert>
 
-Tensor Transformer<BackendType::CPU>::forward(const std::vector<std::vector<int>>& input, int start_pos) {
-    int batch = input.size();
-    int seqlen = input[0].size();
+Tensor Transformer<BackendType::CPU>::forward(const Tensor& input, int start_pos) {
+    int batch = input.shape()[0];
+    int seqlen = input.shape()[1];
 
     Tensor embeddings({batch, seqlen, _args.dim});
     for (int i = 0; i < batch; i++) {
         for (int j = 0; j < seqlen; j++) {
             for (int k = 0; k  < _args.dim; k++) {
-                embeddings.set(_token_embeddings(input[i][j], k), i, j, k);
+                embeddings.set(_token_embeddings(int(input(i, j)), k), i, j, k);
             }
         }
     }

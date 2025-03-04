@@ -23,6 +23,8 @@ public:
             {5, "Attention_ComputeScore"},
             {6, "Attention_Output"},
             {7, "Attention_Result"},
+            {8, "Transformer_TokenEmbedding"},
+            {9, "Transformer_Result"},
         };
         _next_layer_id = 0;
     }

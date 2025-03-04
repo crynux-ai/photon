@@ -14,6 +14,17 @@ struct ModelArgs {
     int max_seq_len = 2048;
 };
 
+enum TransformerTensor {
+    Transformer_INPUT = 0,
+    Transformer_EMBEDDING_TABLE = 1,
+    Transformer_WEIGHT_O = 2,
+    Transformer_INPUT_EMBEDDING = 3,
+    Transformer_INPUT_PARAMS = 4,
+    Transformer_OUTPUT = 5,
+    Transformer_RESULT = 6,
+};
+
+
 
 template <BackendType backend>
 class Transformer {
@@ -25,7 +36,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual Tensor forward(const std::vector<std::vector<int>>& input, int start_pos) = 0;
+    virtual Tensor forward(const Tensor& input, int start_pos) = 0;
 
 protected:
     Transformer(const ModelArgs& args) = default;

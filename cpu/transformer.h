@@ -57,7 +57,7 @@ public:
         _wo.build({ptr, static_cast<size_t>(emb_size)});
     }
 
-    Tensor forward(const std::vector<std::vector<int>>& input, int start_pos);
+    Tensor forward(const Tensor& input, int start_pos);
 
 private:
     std::vector<Attention<BackendType::CPU>> _attention;
