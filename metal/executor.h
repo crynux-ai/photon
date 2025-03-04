@@ -24,6 +24,7 @@ public:
             {6, "Attention_Output"},
             {7, "Attention_Result"},
         };
+        _next_layer_id = 0;
     }
 
     int batch;
@@ -109,6 +110,12 @@ public:
         }
         memcpy(tensor->_value.get(), ptr, cnt * sizeof(float));
     }
+
+    int nextLayerId() {
+        return _next_layer_id++;
+    }
+
+    int _next_layer_id;
 
     id<MTLDevice> _device;
     id<MTLLibrary> _library;
