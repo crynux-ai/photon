@@ -35,8 +35,10 @@ public:
         for (const auto& pair : _funcs) {
             [pair.second release];
         }
-        for (const auto& pair: _buffer) {
-            [pair.second release];
+        for (const auto& obj: _buffer) {
+            for (const auto& pair: obj.second) {
+                [pair.second release];
+            }
         }
 
         [_library release];
@@ -70,7 +72,7 @@ public:
         }
     }
 
-    void forward(int func, std::vector<int> command_args, std::array<int, 3> grid_size) {
+    void forward(int obj_id, int func, std::vector<int> command_args, std::array<int, 3> grid_size) {
         @autoreleasepool {
             _command_queue = [_device newCommandQueue];
             _command_buffer = [_command_queue commandBuffer];
@@ -78,7 +80,7 @@ public:
             [encoder setComputePipelineState:_states[func]];
 
             for (int i = 0; i < command_args.size(); i++) {
-                [encoder setBuffer:_buffer[command_args[i]] offset:0 atIndex:i];
+                [encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i];
             }
 
             MTLSize gridSize = MTLSizeMake(grid_size[0], grid_size[1], grid_size[2]);
@@ -90,13 +92,17 @@ public:
         }
     }
 
-    void addBuffer(int idx, void* data_ptr, size_t data_size) {
+    void addBuffer(int obj_id, int idx, void* data_ptr, size_t data_size) {
         auto tmp = [_device newBufferWithBytes:data_ptr length:data_size options:MTLResourceStorageModeShared];
-        _buffer[idx] = tmp;
+        if (_buffer.find(obj_id) == _buffer.end()) {
+            _buffer.insert({obj_id, {{idx, tmp}}});
+        } else {
+            _buffer[obj_id][idx] = tmp;
+        }
     }
 
-    void bufferToTensor(int idx, Tensor* tensor) {
-        float* ptr = static_cast<float*>(_buffer[idx].contents);
+    void bufferToTensor(int obj_id, int idx, Tensor* tensor) {
+        float* ptr = static_cast<float*>(_buffer[obj_id][idx].contents);
         size_t cnt = 1;
         for (int d : tensor->shape()) {
             cnt *= d;
@@ -109,7 +115,7 @@ public:
     id<MTLCommandQueue> _command_queue;
     id<MTLCommandBuffer> _command_buffer;
 
-    std::map<int, id<MTLBuffer>> _buffer;
+    std::map<int, std::map<int, id<MTLBuffer>>> _buffer;
 
     std::map<int, std::string> _func_names;
     std::map<int, id<MTLFunction>> _funcs;

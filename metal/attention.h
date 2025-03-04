@@ -14,8 +14,11 @@ template <>
 class Attention<BackendType::METAL> {
 
 public:
+    inline static int next_id = 0;
+    int obj_id;
+
     Attention(int dim, int num_heads, int max_seq_len,
-              std::shared_ptr<Executor<BackendType::METAL>> executor) {
+              std::shared_ptr<Executor<BackendType::METAL>> executor) : obj_id(next_id++) {
         _dim = dim;
         _num_heads = num_heads;
         _head_dim = dim / num_heads;
@@ -49,12 +52,12 @@ public:
         size_t cache_size = _executor->batch * _max_seq_len * _dim * sizeof(float);
         size_t weight_size = _dim * _dim * sizeof(float);
 
-        _executor->addBuffer(AttentionTensor::CACHE_K, _cachek._value.get(), cache_size);
-        _executor->addBuffer(AttentionTensor::CACHE_V, _cachev._value.get(), cache_size);
-        _executor->addBuffer(AttentionTensor::WEIGHT_Q, _wq._value.get(), weight_size);
-        _executor->addBuffer(AttentionTensor::WEIGHT_K, _wk._value.get(), weight_size);
-        _executor->addBuffer(AttentionTensor::WEIGHT_V, _wv._value.get(), weight_size);
-        _executor->addBuffer(AttentionTensor::WEIGHT_O, _wo._value.get(), weight_size);
+        _executor->addBuffer(obj_id, AttentionTensor::CACHE_K, _cachek._value.get(), cache_size);
+        _executor->addBuffer(obj_id, AttentionTensor::CACHE_V, _cachev._value.get(), cache_size);
+        _executor->addBuffer(obj_id, AttentionTensor::WEIGHT_Q, _wq._value.get(), weight_size);
+        _executor->addBuffer(obj_id, AttentionTensor::WEIGHT_K, _wk._value.get(), weight_size);
+        _executor->addBuffer(obj_id, AttentionTensor::WEIGHT_V, _wv._value.get(), weight_size);
+        _executor->addBuffer(obj_id, AttentionTensor::WEIGHT_O, _wo._value.get(), weight_size);
     }
 
     Tensor forward(

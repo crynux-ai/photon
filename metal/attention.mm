@@ -27,10 +27,10 @@ Tensor Attention<BackendType::METAL>::forward(
     @autoreleasepool {
         // wq(input), wk(input), wv(input)
         int params[] = {batch, seqlen, _max_seq_len, _dim, start_pos};
-        _executor->addBuffer(AttentionTensor::INPUT, input._value.get(), inputByteSize);
-        _executor->addBuffer(AttentionTensor::XQ, xq._value.get(), inputByteSize);
-        _executor->addBuffer(AttentionTensor::X_PARAMS, params, 5*sizeof(int));
-        _executor->forward(3,
+        _executor->addBuffer(obj_id, AttentionTensor::INPUT, input._value.get(), inputByteSize);
+        _executor->addBuffer(obj_id, AttentionTensor::XQ, xq._value.get(), inputByteSize);
+        _executor->addBuffer(obj_id, AttentionTensor::X_PARAMS, params, 5*sizeof(int));
+        _executor->forward(obj_id, 3,
             {
                 AttentionTensor::X_PARAMS,
                 AttentionTensor::INPUT,
@@ -42,14 +42,13 @@ Tensor Attention<BackendType::METAL>::forward(
                 AttentionTensor::CACHE_V,
             },
             {batch, seqlen, _dim});
-        _executor->bufferToTensor(AttentionTensor::XQ, &xq);
 
         // Rope apply_rotary_emb
         int rope_params[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, num_complex};
-        _executor->addBuffer(AttentionTensor::ROPE_PARAMS, rope_params, 7*sizeof(float));
-        _executor->addBuffer(AttentionTensor::ROPE_COST, rope_cost._value.get(), ropeByteSize);
-        _executor->addBuffer(AttentionTensor::ROPE_SINT, rope_sint._value.get(), ropeByteSize);
-        _executor->forward(4,
+        _executor->addBuffer(obj_id, AttentionTensor::ROPE_PARAMS, rope_params, 7*sizeof(float));
+        _executor->addBuffer(obj_id, AttentionTensor::ROPE_COST, rope_cost._value.get(), ropeByteSize);
+        _executor->addBuffer(obj_id, AttentionTensor::ROPE_SINT, rope_sint._value.get(), ropeByteSize);
+        _executor->forward(obj_id, 4,
             {
                 AttentionTensor::ROPE_PARAMS,
                 AttentionTensor::ROPE_COST,
@@ -62,9 +61,9 @@ Tensor Attention<BackendType::METAL>::forward(
 
         // softmax(QK^T/scale)) (not averaged)
         int compute_score_param[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, mask ? 1 : 0};
-        _executor->addBuffer(AttentionTensor::SCORE_PARAMS, compute_score_param, 7*sizeof(float));
-        _executor->addBuffer(AttentionTensor::SCORE, score._value.get(), scoreByteSize);
-        _executor->forward(5,
+        _executor->addBuffer(obj_id, AttentionTensor::SCORE_PARAMS, compute_score_param, 7*sizeof(float));
+        _executor->addBuffer(obj_id, AttentionTensor::SCORE, score._value.get(), scoreByteSize);
+        _executor->forward(obj_id, 5,
             {
                 AttentionTensor::SCORE_PARAMS,
                 AttentionTensor::XQ,
@@ -73,11 +72,10 @@ Tensor Attention<BackendType::METAL>::forward(
                 AttentionTensor::SCORE,
             },
             {batch, seqlen, totlen * _num_heads});
-        _executor->bufferToTensor(AttentionTensor::SCORE, &score);
 
         // score @ cachev
-        _executor->addBuffer(AttentionTensor::OUTPUT, output._value.get(), inputByteSize);
-        _executor->forward(6,
+        _executor->addBuffer(obj_id, AttentionTensor::OUTPUT, output._value.get(), inputByteSize);
+        _executor->forward(obj_id, 6,
             {
                 AttentionTensor::SCORE_PARAMS,
                 AttentionTensor::SCORE,
@@ -85,18 +83,17 @@ Tensor Attention<BackendType::METAL>::forward(
                 AttentionTensor::OUTPUT,
             },
             {batch, seqlen, _dim});
-        _executor->bufferToTensor(AttentionTensor::OUTPUT, &output);
 
         // Wo @ output
         int result_param[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, residual ? 1 : 0};
-        _executor->addBuffer(AttentionTensor::RESULT_PARAMS, result_param, 7*sizeof(float));
-        _executor->addBuffer(AttentionTensor::RESULT, result._value.get(), inputByteSize);
+        _executor->addBuffer(obj_id, AttentionTensor::RESULT_PARAMS, result_param, 7*sizeof(float));
+        _executor->addBuffer(obj_id, AttentionTensor::RESULT, result._value.get(), inputByteSize);
         int residual_idx = AttentionTensor::INPUT;   // dummy input
         if (residual) {
-            _executor->addBuffer(AttentionTensor::RESIDUAL, residual->_value.get(), inputByteSize);
+            _executor->addBuffer(obj_id, AttentionTensor::RESIDUAL, residual->_value.get(), inputByteSize);
             residual_idx = AttentionTensor::RESIDUAL;
         }
-        _executor->forward(7,
+        _executor->forward(obj_id, 7,
             {
                 AttentionTensor::RESULT_PARAMS,
                 AttentionTensor::OUTPUT,
@@ -107,7 +104,7 @@ Tensor Attention<BackendType::METAL>::forward(
             {batch, seqlen, _dim});
         
         // Convert result
-        _executor->bufferToTensor(AttentionTensor::RESULT, &result);
+        _executor->bufferToTensor(obj_id, AttentionTensor::RESULT, &result);
 
         return result;
     }
