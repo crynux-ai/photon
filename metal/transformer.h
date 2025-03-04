@@ -21,8 +21,10 @@ public:
         _executor = executor;
 
         for (int i = 0; i < args.num_layers; i++) {
-            auto att = std::make_unique<Attention<BackendType::METAL>>(args.dim, args.num_heads, args.max_seq_len, executor);
-            auto ffn = std::make_unique<FFNSwiGLU<BackendType::METAL>>(args.dim, args.dim * 4, args.multiple_of);
+            auto att = std::make_unique<Attention<BackendType::METAL>>(
+                args.dim, args.num_heads, args.max_seq_len, executor);
+            auto ffn = std::make_unique<FFNSwiGLU<BackendType::METAL>>(
+                args.dim, args.dim * 4, args.multiple_of, executor);
 
             _attention.push_back(std::move(att));
             _ffn.push_back(std::move(ffn));

@@ -14,7 +14,9 @@ TEST(FeedForwardTest, FFNSwiGLUTest) {
     int hidden_dim = loader.ReadInt();
     int multiple_of = loader.ReadInt();
 
-    FFNSwiGLU<CURRENT_BACKEND> ffn(dim, hidden_dim, multiple_of);
+    auto executor = std::make_shared<Executor<CURRENT_BACKEND>>(3);
+    executor->build();
+    FFNSwiGLU<CURRENT_BACKEND> ffn(dim, hidden_dim, multiple_of, executor);
     ffn.build(loader.Read(ffn.size()));
 
     int tensor_size = 3 * 7 * 256 * 4 + 16;

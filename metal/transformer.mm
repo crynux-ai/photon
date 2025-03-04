@@ -64,6 +64,7 @@ Tensor Transformer<BackendType::METAL>::forward(const std::vector<std::vector<in
             }
         }
     }
+   
     return result;
 }
 
