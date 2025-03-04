@@ -1,4 +1,5 @@
 #include "include/backend.h"
+#include "include/executor.h"
 #include "include/transformer.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
@@ -36,7 +37,9 @@ TEST(Transformer, TransformerTest) {
         .multiple_of = multiple_of,
         .max_seq_len = maxseqlen,
     };
-    Transformer<CURRENT_BACKEND> layer(args);
+    auto executor = std::make_shared<Executor<CURRENT_BACKEND>>(/*batch=*/3);
+    executor->build();
+    Transformer<CURRENT_BACKEND> layer(args, executor);
     layer.build(loader.Read(layer.size()));
     
     std::vector<std::vector<std::vector<int>>> inputs;
@@ -58,7 +61,7 @@ TEST(Transformer, TransformerTest) {
     int start_pos = 0;
     for (int i = 0; i < num_cases; i++) {
         auto start = high_resolution_clock::now();
-        auto result = layer.forward(inputs[i], start_pos);
+        Tensor result = layer.forward(inputs[i], start_pos);
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << "Time: " << duration.count() << " microseconds" << std::endl;

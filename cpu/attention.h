@@ -1,6 +1,7 @@
 #pragma once
 
 #include "include/backend.h"
+#include "include/executor.h"
 #include "include/attention.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
@@ -12,11 +13,12 @@ template <>
 class Attention<BackendType::CPU> {
 
 public:
-    Attention(int dim, int num_heads, int maxlen) {
+    Attention(int dim, int num_heads, int maxlen, std::shared_ptr<Executor<BackendType::CPU>> executor) {
         _dim = dim;
         _num_heads = num_heads;
         _head_dim = dim / num_heads;
         _maxlen = maxlen;
+        _executor = executor;
         assert(dim % num_heads == 0);
     }
 
@@ -42,6 +44,8 @@ public:
         int start_pos, bool mask, Tensor* residual=nullptr);
 
 private:
+    std::shared_ptr<Executor<BackendType::CPU>> _executor;
+
     Tensor _wq;
     Tensor _wk;
     Tensor _wv;

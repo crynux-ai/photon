@@ -1,4 +1,5 @@
 #include "include/backend.h"
+#include "include/executor.h"
 #include "include/attention.h"
 #include "include/rope.h"
 #include "schema/loader.h"
@@ -23,7 +24,9 @@ TEST(AttentionTest, AttentionTest) {
     
     Tensor wq, wk, wv, wo;
     int tensor_size = dim * dim * 4 + 12;
-    Attention<CURRENT_BACKEND> layer(dim, num_head, maxseqlen);
+    auto executor = std::make_shared<Executor<CURRENT_BACKEND>>(3);
+    executor->build();
+    Attention<CURRENT_BACKEND> layer(dim, num_head, maxseqlen, executor);
     layer.build(loader.Read((dim * dim * 4 + 12) * 4));
 
     Tensor x1, y1, x2, y2, x3, y3, p1, p2, p3;

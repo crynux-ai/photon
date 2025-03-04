@@ -1,6 +1,7 @@
 #pragma once
 
 #include "include/attention.h"
+#include "include/executor.h"
 #include "include/backend.h"
 #include "include/rope.h"
 #include "include/feedforward.h"
@@ -14,12 +15,12 @@ template <>
 class Transformer<BackendType::CPU> {
 
 public:
-    Transformer(const ModelArgs& args) {
+    Transformer(const ModelArgs& args, std::shared_ptr<Executor<BackendType::CPU>> executor) {
         assert(args.dim % args.num_heads == 0);
         _args = args;
 
         for (int i = 0; i < args.num_layers; i++) {
-            _attention.push_back(Attention<BackendType::CPU>(args.dim, args.num_heads, args.max_seq_len));
+            _attention.push_back(Attention<BackendType::CPU>(args.dim, args.num_heads, args.max_seq_len, executor));
             _ffn.push_back(FFNSwiGLU<BackendType::CPU>(args.dim, args.dim * 4, args.multiple_of));
         }
 

@@ -5,6 +5,26 @@
 #include "schema/tensor.h"
 #include <cmath>
 
+enum AttentionTensor {
+    INPUT = 0,
+    CACHE_K = 1,
+    CACHE_V = 2,
+    WEIGHT_Q = 3,
+    WEIGHT_K = 4,
+    WEIGHT_V = 5,
+    WEIGHT_O = 6,
+    XQ = 7,
+    X_PARAMS = 8,
+    ROPE_PARAMS = 9,
+    ROPE_COST = 10,
+    ROPE_SINT = 11,
+    SCORE_PARAMS = 12,
+    SCORE = 13,
+    OUTPUT = 14,
+    RESULT = 15,
+    RESULT_PARAMS = 16,
+    RESIDUAL = 17,
+};
 
 template <BackendType backend>
 class Attention {

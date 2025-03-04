@@ -15,12 +15,13 @@ template <>
 class Transformer<BackendType::METAL> {
 
 public:
-    Transformer(const ModelArgs& args) {
+    Transformer(const ModelArgs& args, std::shared_ptr<Executor<BackendType::METAL>> executor) {
         assert(args.dim % args.num_heads == 0);
         _args = args;
+        _executor = executor;
 
         for (int i = 0; i < args.num_layers; i++) {
-            auto att = std::make_unique<Attention<BackendType::METAL>>(args.dim, args.num_heads, args.max_seq_len);
+            auto att = std::make_unique<Attention<BackendType::METAL>>(args.dim, args.num_heads, args.max_seq_len, executor);
             auto ffn = std::make_unique<FFNSwiGLU<BackendType::METAL>>(args.dim, args.dim * 4, args.multiple_of);
 
             _attention.push_back(std::move(att));
@@ -92,6 +93,7 @@ public:
     Tensor forward(const std::vector<std::vector<int>>& input, int start_pos);
 
 private:
+    std::shared_ptr<Executor<BackendType::METAL>> _executor;
     std::vector<std::unique_ptr<Attention<BackendType::METAL>>> _attention;
     std::vector<std::unique_ptr<FFNSwiGLU<BackendType::METAL>>> _ffn;
     Tensor _rope_cost;
