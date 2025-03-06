@@ -36,9 +36,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual Tensor forward(
-        const Tensor& input, const Tensor& rope_cost, const Tensor& rope_sint,
-        int start_pos, bool mask, Tensor* residual=nullptr) = 0;
+    virtual void forward(int seqlen, int start_pos, bool mask, bool residual) = 0;
 
 protected:
     Attention(int dim, int num_heads) = default;

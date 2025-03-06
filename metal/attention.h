@@ -60,9 +60,7 @@ public:
         _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo._value.get(), weight_size);
     }
 
-    Tensor forward(
-        const Tensor& input, const Tensor& cost, const Tensor& sint,
-        int start_pos, bool mask, Tensor* residual=nullptr);
+    void forward(int seqlen, int start_pos, bool mask, bool residual);
 
 private:
     Tensor _wq;

@@ -29,17 +29,15 @@ Tensor RMSNorm(const Tensor& x, float norm_eps) {
 }
 
 
-Tensor Transformer<BackendType::METAL>::forward(const Tensor& input, int start_pos) {
-    int batch = input.shape()[0];
-    int seqlen = input.shape()[1];
-
+void Transformer<BackendType::METAL>::forward(int seqlen, int start_pos) {
+    int batch = _executor->batch;
     Tensor embeddings({batch, seqlen, _args.dim});
     size_t input_size = batch * seqlen * sizeof(float);
     size_t emb_size = batch * seqlen * _args.dim * sizeof(float);
+    size_t rope_size = _args.max_seq_len * _args.dim / 2 * sizeof(float);
 
     int params[] = {batch, seqlen, _args.max_seq_len, _args.dim, start_pos, _args.vocab_size};
     _executor->addBuffer(obj_id, Transformer_INPUT_PARAMS, params, 6 * sizeof(int));
-    _executor->addBuffer(obj_id, Transformer_INPUT, input._value.get(), input_size);
     _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, embeddings._value.get(), emb_size);
     _executor->forward(obj_id, 8,
         {
@@ -54,12 +52,19 @@ Tensor Transformer<BackendType::METAL>::forward(const Tensor& input, int start_p
     for (int l = 0; l < _args.num_layers; l++) {
         // Attention
         auto norm_input = RMSNorm(embeddings, _args.norm_eps);
-        embeddings = _attention[l]->forward(norm_input, _rope_cost, _rope_sint, start_pos,
-            /*mask=*/seqlen > 1, /*residual=*/&embeddings);
+        _executor->addBuffer(_attention[l]->obj_id, Attention_INPUT, norm_input._value.get(), emb_size);
+        _executor->addBuffer(_attention[l]->obj_id, Attention_RESIDUAL, embeddings._value.get(), emb_size);
+        _executor->addBuffer(_attention[l]->obj_id, Attention_ROPE_COST, _rope_cost._value.get(), rope_size);
+        _executor->addBuffer(_attention[l]->obj_id, Attention_ROPE_SINT, _rope_sint._value.get(), rope_size);
+        _attention[l]->forward(seqlen, start_pos, /*mask=*/seqlen > 1, /*residual=*/true);
+        _executor->bufferToTensor(_attention[l]->obj_id, Attention_RESULT, &embeddings);
 
         // FFN
         norm_input = RMSNorm(embeddings, _args.norm_eps);
-        embeddings = _ffn[l]->forward(norm_input, /*residual=*/&embeddings);
+        _executor->addBuffer(_ffn[l]->obj_id, FFNSwiGLU_INPUT, norm_input._value.get(), emb_size);
+        _executor->addBuffer(_ffn[l]->obj_id, FFNSwiGLU_RESIDUAL, embeddings._value.get(), emb_size);
+        _ffn[l]->forward(seqlen, true);
+        _executor->bufferToTensor(_ffn[l]->obj_id, FFNSwiGLU_RESULT, &embeddings);
     }
     embeddings = RMSNorm(embeddings, _args.norm_eps);
 
@@ -75,7 +80,5 @@ Tensor Transformer<BackendType::METAL>::forward(const Tensor& input, int start_p
             Transformer_RESULT,
         },
         {batch, seqlen, _args.vocab_size});
-    _executor->bufferToTensor(obj_id, Transformer_RESULT, &result);
-    return result;
 }
 

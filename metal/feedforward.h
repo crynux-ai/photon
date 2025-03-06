@@ -46,7 +46,7 @@ public:
         _executor->addBuffer(obj_id, FFNSwiGLU_W3, _w3._value.get(), weight_size);
     }
 
-    Tensor forward(const Tensor& input, Tensor* residual=nullptr);
+    void forward(int seqlen, bool residual=false);
 
 private:
     std::shared_ptr<Executor<BackendType::METAL>> _executor;

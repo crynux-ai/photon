@@ -30,7 +30,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual Tensor forward(const Tensor& input, Tensor* residual=nullptr) = 0;
+    virtual void forward(int seqlen, bool residual) = 0;
 
 protected:
     FFNSwiGLU(int dim, int hidden_dim, int multiple_of) = default;

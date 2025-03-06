@@ -28,7 +28,7 @@ TEST(Transformer, TransformerTest) {
         shapes.push_back({d1, d2});
     }
 
-
+METAL_ARC_BEGIN
     ModelArgs args = {
         .dim = dim,
         .num_layers = num_layers,
@@ -60,15 +60,23 @@ TEST(Transformer, TransformerTest) {
 
     int start_pos = 0;
     for (int i = 0; i < num_cases; i++) {
+        int batch = inputs[i]->shape()[0];
+        int seqlen = inputs[i]->shape()[1];
+        executor->addBuffer(layer.obj_id, Transformer_INPUT, inputs[i]->_value.get(), batch * seqlen * sizeof(float));
+
         auto start = high_resolution_clock::now();
-        Tensor result = layer.forward(*inputs[i], start_pos);
+        for (int j=0; j < 10; j++)
+        layer.forward(seqlen, start_pos);
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << "Time: " << duration.count() << " microseconds" << std::endl;
 
-        start_pos += inputs[i]->shape()[1];
+        start_pos += seqlen;
+        Tensor result({batch, seqlen, vocab_size});
+        executor->bufferToTensor(layer.obj_id, Transformer_RESULT, &result);
         EXPECT_EQ(result.eq(outputs[i], true), true);
     }
+METAL_ARC_END
 }
 
 int main(int argc, char **argv) {

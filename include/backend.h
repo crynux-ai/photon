@@ -15,3 +15,12 @@ enum class BackendType {
         #define CURRENT_BACKEND BackendType::CPU
     #endif
 #endif
+
+
+#ifdef PHOTON_METAL
+    #define METAL_ARC_BEGIN @autoreleasepool {
+    #define METAL_ARC_END }
+#else
+    #define METAL_ARC_BEGIN
+    #define METAL_ARC_END
+#endif

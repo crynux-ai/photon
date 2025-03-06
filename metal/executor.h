@@ -31,23 +31,7 @@ public:
 
     int batch;
 
-    ~Executor() {
-        for (const auto& pair : _states) {
-            [pair.second release];
-        }
-        for (const auto& pair : _funcs) {
-            [pair.second release];
-        }
-        for (const auto& obj: _buffer) {
-            for (const auto& pair: obj.second) {
-                [pair.second release];
-            }
-        }
-
-        [_command_queue release];
-        [_library release];
-        [_device release];
-    }
+    ~Executor() {}
 
     void build() {
         @autoreleasepool {
@@ -102,6 +86,15 @@ public:
             _buffer.insert({obj_id, {{idx, tmp}}});
         } else {
             _buffer[obj_id][idx] = tmp;
+        }
+    }
+
+    void addBuffer(int obj_id, int idx, int src_obj_id, int src_tensor_id) {
+        auto buf = _buffer[src_obj_id][src_tensor_id];
+        if (_buffer.find(obj_id) == _buffer.end()) {
+            _buffer.insert({obj_id, {{idx, buf}}});
+        } else {
+            _buffer[obj_id][idx] = buf;
         }
     }
 

@@ -36,7 +36,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual Tensor forward(const Tensor& input, int start_pos) = 0;
+    virtual void forward(int seqlen, int start_pos) = 0;
 
 protected:
     Transformer(const ModelArgs& args) = default;

@@ -3,13 +3,10 @@
 #include <cassert>
 
 
-Tensor Attention<BackendType::METAL>::forward(
-        const Tensor& input, const Tensor& rope_cost, const Tensor& rope_sint,
-        int start_pos, bool mask, Tensor* residual) {
+void Attention<BackendType::METAL>::forward(
+        int seqlen, int start_pos, bool mask, bool residual) {
     int batch = _executor->batch;
-    assert(batch == input.shape()[0]);
-    int seqlen = input.shape()[1];
-    int num_complex = rope_cost.shape()[1];
+    int num_complex = _dim / _num_heads / 2;
     int totlen = start_pos + seqlen;
 
     size_t inputByteSize = batch * seqlen * _dim * sizeof(float);
@@ -26,7 +23,6 @@ Tensor Attention<BackendType::METAL>::forward(
 
     // wq(input), wk(input), wv(input)
     int params[] = {batch, seqlen, _max_seq_len, _dim, start_pos};
-    _executor->addBuffer(obj_id, Attention_INPUT, input._value.get(), inputByteSize);
     _executor->addBuffer(obj_id, Attention_XQ, xq._value.get(), inputByteSize);
     _executor->addBuffer(obj_id, Attention_X_PARAMS, params, 5*sizeof(int));
     _executor->forward(obj_id, 3,
@@ -45,8 +41,6 @@ Tensor Attention<BackendType::METAL>::forward(
     // Rope apply_rotary_emb
     int rope_params[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, num_complex};
     _executor->addBuffer(obj_id, Attention_ROPE_PARAMS, rope_params, 7*sizeof(float));
-    _executor->addBuffer(obj_id, Attention_ROPE_COST, rope_cost._value.get(), ropeByteSize);
-    _executor->addBuffer(obj_id, Attention_ROPE_SINT, rope_sint._value.get(), ropeByteSize);
     _executor->forward(obj_id, 4,
         {
             Attention_ROPE_PARAMS,
@@ -87,23 +81,16 @@ Tensor Attention<BackendType::METAL>::forward(
     int result_param[] = {batch, _max_seq_len, seqlen, start_pos, _dim, _num_heads, residual ? 1 : 0};
     _executor->addBuffer(obj_id, Attention_RESULT_PARAMS, result_param, 7*sizeof(float));
     _executor->addBuffer(obj_id, Attention_RESULT, result._value.get(), inputByteSize);
-    int residual_idx = Attention_INPUT;   // dummy input
-    if (residual) {
-        _executor->addBuffer(obj_id, Attention_RESIDUAL, residual->_value.get(), inputByteSize);
-        residual_idx = Attention_RESIDUAL;
+    if (!residual) {
+        _executor->addBuffer(obj_id, Attention_RESIDUAL, obj_id, Attention_INPUT);  // dummy input  
     }
     _executor->forward(obj_id, 7,
         {
             Attention_RESULT_PARAMS,
             Attention_OUTPUT,
             Attention_WEIGHT_O,
-            residual_idx,
+            Attention_RESIDUAL,
             Attention_RESULT,
         },
         {batch, seqlen, _dim});
-    
-    // Convert result
-    _executor->bufferToTensor(obj_id, Attention_RESULT, &result);
-
-    return result;
 }

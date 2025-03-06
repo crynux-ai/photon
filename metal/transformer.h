@@ -14,9 +14,9 @@
 template <>
 class Transformer<BackendType::METAL> {
 
-int obj_id;
-
 public:
+    int obj_id;
+
     Transformer(const ModelArgs& args, std::shared_ptr<Executor<BackendType::METAL>> executor) {
         assert(args.dim % args.num_heads == 0);
         _args = args;
@@ -71,7 +71,7 @@ public:
         _executor->addBuffer(obj_id, Transformer_WEIGHT_O, _wo._value.get(), emb_size);
     }
 
-    Tensor forward(const Tensor& input, int start_pos);
+    void forward(int seqlen, int start_pos);
 
 private:
     std::shared_ptr<Executor<BackendType::METAL>> _executor;
