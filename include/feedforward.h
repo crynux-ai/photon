@@ -2,6 +2,7 @@
 
 #include "include/backend.h"
 #include "include/executor.h"
+#include "include/params.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
 
@@ -9,11 +10,9 @@
 
 enum FFNSwiGLUTensor {
     FFNSwiGLU_INPUT = 0,
-    FFNSwiGLU_PARAM_1 = 1,
     FFNSwiGLU_W1 = 2,
     FFNSwiGLU_W2 = 3,
     FFNSwiGLU_W3 = 4,
-    FFNSwiGLU_PARAM_2 = 5,
     FFNSwiGLU_RESIDUAL = 6,
     FFNSwiGLU_RESULT = 7,
     FFNSwiGLU_HIDDEN_OUTPUT = 8,
@@ -30,7 +29,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual void forward(int seqlen, bool residual) = 0;
+    virtual void forward(const RunParams& param) = 0;
 
 protected:
     FFNSwiGLU(int dim, int hidden_dim, int multiple_of) = default;

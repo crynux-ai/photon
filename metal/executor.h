@@ -2,6 +2,7 @@
 
 #include "include/backend.h"
 #include "include/executor.h"
+#include "include/params.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
 
@@ -61,14 +62,15 @@ public:
         }
     }
 
-    void forward(int obj_id, int func, std::vector<int> command_args, std::array<int, 3> grid_size) {
+    void forward(int obj_id, int func, const RunParams& param, std::vector<int> command_args, std::array<int, 3> grid_size) {
         @autoreleasepool {
             _command_buffer = [_command_queue commandBuffer];
             id<MTLComputeCommandEncoder> encoder = [_command_buffer computeCommandEncoder];
             [encoder setComputePipelineState:_states[func]];
 
+            [encoder setBytes:&param length:sizeof(param) atIndex:0];
             for (int i = 0; i < command_args.size(); i++) {
-                [encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i];
+                [encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i+1];
             }
 
             MTLSize gridSize = MTLSizeMake(grid_size[0], grid_size[1], grid_size[2]);

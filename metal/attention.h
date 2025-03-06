@@ -35,32 +35,32 @@ public:
 
     void build(std::string_view content) {
         auto ptr = content.data();
-        auto weight_read_size = _dim * _dim * 4 + 12;
+        size_t weight_bytes = _dim * _dim * sizeof(float) + 12;
+        size_t cache_bytes = _executor->batch * _max_seq_len * _dim * sizeof(float);
 
-        _wq.build({ptr, static_cast<size_t>(weight_read_size)});
-        ptr += weight_read_size;
-        _wk.build({ptr, static_cast<size_t>(weight_read_size)});
-        ptr += weight_read_size;
-        _wv.build({ptr, static_cast<size_t>(weight_read_size)});
-        ptr += weight_read_size;
-        _wo.build({ptr, static_cast<size_t>(weight_read_size)});
+        _wq.build({ptr, static_cast<size_t>(weight_bytes)});
+        ptr += weight_bytes;
+        _wk.build({ptr, static_cast<size_t>(weight_bytes)});
+        ptr += weight_bytes;
+        _wv.build({ptr, static_cast<size_t>(weight_bytes)});
+        ptr += weight_bytes;
+        _wo.build({ptr, static_cast<size_t>(weight_bytes)});
 
         assert(_executor->batch > 0);
         _cachek = Tensor({_executor->batch, _max_seq_len, _dim});
         _cachev = Tensor({_executor->batch, _max_seq_len, _dim});
 
-        size_t cache_size = _executor->batch * _max_seq_len * _dim * sizeof(float);
-        size_t weight_size = _dim * _dim * sizeof(float);
-
-        _executor->addBuffer(obj_id, Attention_CACHE_K, _cachek._value.get(), cache_size);
-        _executor->addBuffer(obj_id, Attention_CACHE_V, _cachev._value.get(), cache_size);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_Q, _wq._value.get(), weight_size);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_K, _wk._value.get(), weight_size);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_V, _wv._value.get(), weight_size);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo._value.get(), weight_size);
+        
+        weight_bytes -= 12;
+        _executor->addBuffer(obj_id, Attention_CACHE_K, _cachek._value.get(), cache_bytes);
+        _executor->addBuffer(obj_id, Attention_CACHE_V, _cachev._value.get(), cache_bytes);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_Q, _wq._value.get(), weight_bytes);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_K, _wk._value.get(), weight_bytes);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_V, _wv._value.get(), weight_bytes);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo._value.get(), weight_bytes);
     }
 
-    void forward(int seqlen, int start_pos, bool mask, bool residual);
+    void forward(const RunParams& param);
 
 private:
     Tensor _wq;

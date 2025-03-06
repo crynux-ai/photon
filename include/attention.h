@@ -2,6 +2,7 @@
 
 #include "include/backend.h"
 #include "include/rope.h"
+#include "include/params.h"
 #include "schema/tensor.h"
 #include <cmath>
 
@@ -14,15 +15,11 @@ enum AttentionTensor {
     Attention_WEIGHT_V = 5,
     Attention_WEIGHT_O = 6,
     Attention_XQ = 7,
-    Attention_X_PARAMS = 8,
-    Attention_ROPE_PARAMS = 9,
     Attention_ROPE_COST = 10,
     Attention_ROPE_SINT = 11,
-    Attention_SCORE_PARAMS = 12,
     Attention_SCORE = 13,
     Attention_OUTPUT = 14,
     Attention_RESULT = 15,
-    Attention_RESULT_PARAMS = 16,
     Attention_RESIDUAL = 17,
 };
 
@@ -36,7 +33,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual void forward(int seqlen, int start_pos, bool mask, bool residual) = 0;
+    virtual void forward(const RunParams& param) = 0;
 
 protected:
     Attention(int dim, int num_heads) = default;

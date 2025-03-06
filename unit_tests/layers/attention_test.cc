@@ -42,21 +42,39 @@ METAL_ARC_BEGIN
     x3.build(loader.Read(3*2*256*4 + 16));
     y3.build(loader.Read(3*2*256*4 + 16));
 
+    RunParams param = {
+        .batch = 3,
+        .seq_len = 7,
+        .max_seq_len = maxseqlen,
+        .start_pos = 0,
+        .dim = dim,
+        .num_heads = num_head,
+        .head_dim = head_dim,
+        .num_complex = head_dim / 2,
+        .mask = true,
+        .residual =false,
+    };
+
     size_t input_size = 3 * 7 * 256 * 4;
     executor->addBuffer(layer.obj_id, Attention_INPUT, x1._value.get(), input_size);
-    layer.forward(7, 0, true, false);
+    layer.forward(param);
     Tensor p1({3, 7, 256});
     executor->bufferToTensor(layer.obj_id, Attention_RESULT, &p1);
 
     input_size = 3 * 3 * 256 * 4;
     executor->addBuffer(layer.obj_id, Attention_INPUT, x2._value.get(), input_size);
-    layer.forward(3, 7, true, false);
+    param.seq_len = 3;
+    param.start_pos = 7;
+    layer.forward(param);
     Tensor p2({3, 3, 256});
     executor->bufferToTensor(layer.obj_id, Attention_RESULT, &p2);
 
     input_size = 3 * 2 * 256 * 4;
     executor->addBuffer(layer.obj_id, Attention_INPUT, x3._value.get(), input_size);
-    layer.forward(2, 10, false, false);
+    param.seq_len = 2;
+    param.start_pos = 10;
+    param.mask = false;
+    layer.forward(param);
     Tensor p3({3, 2, 256});
     executor->bufferToTensor(layer.obj_id, Attention_RESULT, &p3);
     

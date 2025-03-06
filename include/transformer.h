@@ -1,18 +1,9 @@
 #pragma once
 
 #include "include/backend.h"
+#include "include/params.h"
 #include "schema/tensor.h"
 #include <cmath>
-
-struct ModelArgs {
-    int dim;
-    int num_layers;
-    int num_heads;
-    int vocab_size;
-    int multiple_of;
-    float norm_eps = 1e-5;
-    int max_seq_len = 2048;
-};
 
 enum TransformerTensor {
     Transformer_INPUT = 0,
@@ -25,7 +16,6 @@ enum TransformerTensor {
 };
 
 
-
 template <BackendType backend>
 class Transformer {
 
@@ -36,7 +26,7 @@ public:
 
     virtual void build(std::string_view content) = 0;
 
-    virtual void forward(int seqlen, int start_pos) = 0;
+    virtual void forward(const RunParams& param) = 0;
 
 protected:
     Transformer(const ModelArgs& args) = default;

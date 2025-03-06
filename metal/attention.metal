@@ -1,9 +1,10 @@
 #include <metal_stdlib>
+#include "params.metal"
 
 using namespace metal;
 
 kernel void Attention_Step1(
-    constant int *params           [[ buffer(0) ]],
+    constant RunParams *param      [[ buffer(0) ]],
     const device float *input      [[ buffer(1) ]],     // [batch, seqlen, dim]
     const device float *wq         [[ buffer(2) ]],     // [dim, dim]
     const device float *wk         [[ buffer(3) ]],     // [dim, dim]
@@ -13,16 +14,10 @@ kernel void Attention_Step1(
     device float *cachev           [[ buffer(7) ]],     // [batch, max_seq_len, dim]
     uint3 gid                      [[ thread_position_in_grid ]])
 {
-    uint batch = params[0];
-    uint seqlen = params[1];
-    uint max_seq_len = params[2];
-    uint dim = params[3];
-    uint startpos = params[4];
-
     uint b = gid.x;
     uint i = gid.y;
     uint j = gid.z;
-    if (b >= batch || i >= seqlen || j >= dim) {
+    if (b >= param[0].batch || i >= param[0].seq_len || j >= param[0].dim) {
         return;
     }
     
@@ -30,10 +25,10 @@ kernel void Attention_Step1(
     float valk = 0.0;
     float valv = 0.0;
 
-    uint base = (b * seqlen + i) * dim;
+    uint base = (b * param[0].seq_len + i) * param[0].dim;
     uint input_ptr = base;
-    uint w_ptr = j * dim;
-    for (uint k = 0; k < dim; k++, input_ptr++, w_ptr++) {
+    uint w_ptr = j * param[0].dim;
+    for (uint k = 0; k < param[0].dim; k++, input_ptr++, w_ptr++) {
         valq += input[input_ptr] * wq[w_ptr];
         valk += input[input_ptr] * wk[w_ptr];
         valv += input[input_ptr] * wv[w_ptr];
@@ -42,136 +37,111 @@ kernel void Attention_Step1(
     uint res_ptr = base + j;
     xq[res_ptr] = valq;
 
-    res_ptr = (b * max_seq_len + i + startpos) * dim + j;
+    res_ptr = (b * param[0].max_seq_len + i + param[0].start_pos) * param[0].dim + j;
     cachek[res_ptr] = valk;
     cachev[res_ptr] = valv;
 }
 
 
 kernel void Attention_ComputeScore(
-    constant int *params           [[ buffer(0) ]],
+    constant RunParams *param      [[ buffer(0) ]],
     const device float *xq         [[ buffer(1) ]],     // [batch, seqlen, dim]
     const device float *cachek     [[ buffer(2) ]],     // [batch, max_seq_len, dim]
     const device float *cachev     [[ buffer(3) ]],     // [batch, max_seq_len, dim]
     device float *score            [[ buffer(4) ]],     // [batch, seqlen, max_seq_len, num_head]
     uint3 gid                      [[ thread_position_in_grid ]])
 {
-    int batch = params[0];
-    int max_seq_len = params[1];
-    int seqlen = params[2];
-    int startpos = params[3];
-    int dim = params[4];
-    int num_heads = params[5];
-    int head_dim = dim / num_heads;
-    int mask = params[6];
-    int totlen = seqlen + startpos;
-    float scale = sqrt(float(head_dim));
+    int totlen = param[0].seq_len + param[0].start_pos;
+    float scale = sqrt(float(param[0].head_dim));
 
     int b = gid.x;
     int i = gid.y;
     int j = gid.z;
-    if (b >= batch || i >= seqlen || j >= totlen * num_heads) {
+    if (b >= param[0].batch || i >= param[0].seq_len || j >= totlen * param[0].num_heads) {
         return;
     }
-    int h = j % num_heads;
-    j = j / num_heads;
+    int h = j % param[0].num_heads;
+    j = j / param[0].num_heads;
 
     int fill = totlen;
-    if (mask > 0) {
-        fill = startpos + i;
+    if (param[0].mask > 0) {
+        fill = param[0].start_pos + i;
     }
 
-    int ptr = (b * seqlen + i) * max_seq_len * num_heads + gid.z;
+    int ptr = (b * param[0].seq_len + i) * param[0].max_seq_len * param[0].num_heads + gid.z;
     if (j > fill) {
         score[ptr] = 0;
         return;
     }
 
     float tmp = 0;
-    int ptrq = (b * seqlen + i) * dim + h * head_dim;
-    int ptrk = (b * max_seq_len + j) * dim + h * head_dim;
-    for (int k = 0; k < head_dim; k++, ptrq++, ptrk++) {
+    int ptrq = (b * param[0].seq_len + i) * param[0].dim + h * param[0].head_dim;
+    int ptrk = (b * param[0].max_seq_len + j) * param[0].dim + h * param[0].head_dim;
+    for (int k = 0; k < param[0].head_dim; k++, ptrq++, ptrk++) {
         tmp += xq[ptrq] * cachek[ptrk];
     } 
     score[ptr] = exp(tmp / scale);
 }
 
 kernel void Attention_Output(
-    constant int *params           [[ buffer(0) ]],
+    constant RunParams *param      [[ buffer(0) ]],
     const device float *score      [[ buffer(1) ]],     // [batch, seqlen, max_seq_len, num_head]
     const device float *cachev     [[ buffer(2) ]],     // [batch, max_seq_len, dim]
     device float *output           [[ buffer(3) ]],     // [batch, seqlen, dim]
     uint3 gid                      [[ thread_position_in_grid ]])
 {
-    uint batch = params[0];
-    uint max_seq_len = params[1];
-    uint seqlen = params[2];
-    uint startpos = params[3];
-    uint dim = params[4];
-    uint num_heads = params[5];
-    uint head_dim = dim / num_heads;
-    uint mask = params[6];
-    uint totlen = seqlen + startpos;
+    uint totlen = param[0].seq_len + param[0].start_pos;
 
     uint b = gid.x;
     uint i = gid.y;
     uint j = gid.z;
-    if (b >= batch || i >= seqlen || j >= dim) {
+    if (b >= param[0].batch || i >= param[0].seq_len || j >= param[0].dim) {
         return;
     }
-    uint h = j / head_dim;
+    uint h = j / param[0].head_dim;
 
-
-    uint base = (b * seqlen + i) * max_seq_len * num_heads + h;
+    uint base = (b * param[0].seq_len + i) * param[0].max_seq_len * param[0].num_heads + h;
     uint ptrscore = base;
     float sum = 0;
 
-    for (int k = 0; k < totlen; k++, ptrscore += num_heads) {
+    for (int k = 0; k < totlen; k++, ptrscore += param[0].num_heads) {
         sum += score[ptrscore];
     }
 
     ptrscore = base;
     float res = 0;
-    uint ptrv = b * max_seq_len * dim + j;
-    for (int k = 0; k < totlen; k++, ptrscore += num_heads, ptrv += dim) {
+    uint ptrv = b * param[0].max_seq_len * param[0].dim + j;
+    for (int k = 0; k < totlen; k++, ptrscore += param[0].num_heads, ptrv += param[0].dim) {
         res += score[ptrscore] * cachev[ptrv];
     }
-    output[(b * seqlen + i) * dim + j] = res / sum;
+    output[(b * param[0].seq_len + i) * param[0].dim + j] = res / sum;
 }
 
 kernel void Attention_Result(
-    constant int *params           [[ buffer(0) ]],
+    constant RunParams *param      [[ buffer(0) ]],
     const device float *output     [[ buffer(1) ]],     // [batch, seqlen, dim]
     const device float *wo         [[ buffer(2) ]],     // [batch, dim, dim]
     const device float *residual   [[ buffer(3) ]],     // [batch, seqlen, dim]
     device float *result           [[ buffer(4) ]],     // [batch, seqlen, dim]
     uint3 gid                      [[ thread_position_in_grid ]])
 {
-    uint batch = params[0];
-    uint max_seq_len = params[1];
-    uint seqlen = params[2];
-    uint startpos = params[3];
-    uint dim = params[4];
-    uint num_heads = params[5];
-    uint add_residual = params[6];
-
     uint b = gid.x;
     uint i = gid.y;
     uint j = gid.z;
-    if (b >= batch || i >= seqlen || j >= dim) {
+    if (b >= param[0].batch || i >= param[0].seq_len || j >= param[0].dim) {
         return;
     }
     
     float tmp = 0;
-    int ptrw = j * dim;
-    int ptr = (b * seqlen + i) * dim;
+    int ptrw = j * param[0].dim;
+    int ptr = (b * param[0].seq_len + i) * param[0].dim;
     int ptro = ptr;
-    for (int k = 0; k < dim; k++, ptrw++, ptro++) {
+    for (int k = 0; k < param[0].dim; k++, ptrw++, ptro++) {
         tmp += wo[ptrw] * output[ptro];
     }
 
     ptr += j;
-    if (add_residual > 0) {
+    if (param[0].residual > 0) {
         tmp += residual[ptr];
     }
     result[ptr] = tmp;

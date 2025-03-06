@@ -71,7 +71,7 @@ public:
         _executor->addBuffer(obj_id, Transformer_WEIGHT_O, _wo._value.get(), emb_size);
     }
 
-    void forward(int seqlen, int start_pos);
+    void forward(const RunParams& param);
 
 private:
     std::shared_ptr<Executor<BackendType::METAL>> _executor;

@@ -37,6 +37,23 @@ METAL_ARC_BEGIN
         .multiple_of = multiple_of,
         .max_seq_len = maxseqlen,
     };
+
+    RunParams params = {
+        .batch = 3,
+        .seq_len = 0,
+        .max_seq_len = maxseqlen,
+        .start_pos = 0,
+        .dim = dim,
+        .actual_hidden_dim = FFNSwiGLU<CURRENT_BACKEND>::calc_hidden_dim(dim*4, multiple_of),
+        .num_heads = num_heads,
+        .head_dim = dim / num_heads,
+        .num_complex = dim / num_heads /2,
+        .vocab_size = vocab_size,
+        .mask = false,
+        .residual = false,
+    };
+
+
     auto executor = std::make_shared<Executor<CURRENT_BACKEND>>(/*batch=*/3);
     executor->build();
     Transformer<CURRENT_BACKEND> layer(args, executor);
@@ -62,16 +79,17 @@ METAL_ARC_BEGIN
     for (int i = 0; i < num_cases; i++) {
         int batch = inputs[i]->shape()[0];
         int seqlen = inputs[i]->shape()[1];
+        params.seq_len = seqlen;
         executor->addBuffer(layer.obj_id, Transformer_INPUT, inputs[i]->_value.get(), batch * seqlen * sizeof(float));
 
         auto start = high_resolution_clock::now();
         for (int j=0; j < 10; j++)
-        layer.forward(seqlen, start_pos);
+        layer.forward(params);
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << "Time: " << duration.count() << " microseconds" << std::endl;
 
-        start_pos += seqlen;
+        params.start_pos += params.seq_len;
         Tensor result({batch, seqlen, vocab_size});
         executor->bufferToTensor(layer.obj_id, Transformer_RESULT, &result);
         EXPECT_EQ(result.eq(outputs[i], true), true);

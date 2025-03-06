@@ -1,4 +1,5 @@
 #include "include/rope.h"
+#include "include/params.h"
 
 #include <cassert>
 #import <Foundation/Foundation.h>
@@ -50,8 +51,18 @@ void apply_rotary_emb<BackendType::METAL>(
         size_t ropeByteSize = max_seq_len * num_complex * sizeof(float);
         size_t xqByteSize = batch * seqlen * dim * sizeof(float);
         size_t cacheByteSize = batch * max_seq_len * dim * sizeof(float);
-        int rope_params[] = {batch, max_seq_len, seqlen, start_pos, dim, num_head, num_complex};
-        id<MTLBuffer> bufferParam = [_device newBufferWithBytes:rope_params length:7*sizeof(float) options:MTLResourceStorageModeShared];
+        RunParams param = {
+            .batch = batch,
+            .seq_len = seqlen,
+            .max_seq_len = max_seq_len,
+            .start_pos = start_pos,
+            .dim = dim,
+            .num_heads = num_head,
+            .head_dim = head_dim,
+            .num_complex = num_complex,
+        };
+
+        id<MTLBuffer> bufferParam = [_device newBufferWithBytes:&param length:sizeof(param) options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferCost = [_device newBufferWithBytes:cost._value.get() length:ropeByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferSint = [_device newBufferWithBytes:sint._value.get() length:ropeByteSize options:MTLResourceStorageModeShared];
         id<MTLBuffer> bufferXq = [_device newBufferWithBytes:xq->_value.get() length:xqByteSize options:MTLResourceStorageModeShared];
