@@ -13,6 +13,7 @@ enum TransformerTensor {
     Transformer_INPUT_PARAMS = 4,
     Transformer_OUTPUT = 5,
     Transformer_RESULT = 6,
+    Transformer_INPUT_NORMS = 7,
 };
 
 

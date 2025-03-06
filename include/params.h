@@ -27,4 +27,6 @@ struct RunParams {
 
     int mask;
     int residual;
+
+    float norm_eps = 1e-5;
 };

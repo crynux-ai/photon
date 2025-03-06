@@ -40,13 +40,6 @@ METAL_ARC_BEGIN
     Tensor z({3, 7, 256});
     executor->bufferToTensor(ffn.obj_id, FFNSwiGLU_RESULT, &z);
     EXPECT_EQ(z.eq(y, true), true);
-
-    for (int i = 0; i < 7; i++) {
-        for (int j = 0; j < 100; j++) {
-            std::cout << z(1,i,j) << " " << y(1, i, j) << std::endl;
-        }
-        std::cout << std::endl;
-    }
 METAL_ARC_END
 }
 

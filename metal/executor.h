@@ -26,6 +26,7 @@ public:
             {7, "Attention_Result"},
             {8, "Transformer_TokenEmbedding"},
             {9, "Transformer_Result"},
+            {10, "Norm_RMS"},
         };
         _next_layer_id = 0;
     }

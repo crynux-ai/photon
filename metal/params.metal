@@ -13,4 +13,6 @@ struct RunParams {
 
     int mask;
     int residual;
+
+    float norm_eps;
 };
