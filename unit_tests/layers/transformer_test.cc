@@ -80,7 +80,7 @@ METAL_ARC_BEGIN
         int batch = inputs[i]->shape()[0];
         int seqlen = inputs[i]->shape()[1];
         params.seq_len = seqlen;
-        executor->addBuffer(layer.obj_id, Transformer_INPUT, inputs[i]->_value.get(), batch * seqlen * sizeof(float));
+        executor->addBuffer(layer.obj_id, Transformer_INPUT, *inputs[i]);
 
         auto start = high_resolution_clock::now();
         for (int j=0; j < 10; j++)
@@ -90,9 +90,8 @@ METAL_ARC_BEGIN
         std::cout << "Time: " << duration.count() << " microseconds" << std::endl;
 
         params.start_pos += params.seq_len;
-        Tensor result({batch, seqlen, vocab_size});
-        executor->bufferToTensor(layer.obj_id, Transformer_RESULT, &result);
-        EXPECT_EQ(result.eq(outputs[i], true), true);
+        auto result = executor->bufferToTensor(layer.obj_id, Transformer_RESULT, {batch, seqlen, vocab_size});
+        EXPECT_EQ(result->eq(outputs[i], true), true);
     }
 METAL_ARC_END
 }

@@ -52,12 +52,12 @@ public:
 
         
         weight_bytes -= 12;
-        _executor->addBuffer(obj_id, Attention_CACHE_K, _cachek._value.get(), cache_bytes);
-        _executor->addBuffer(obj_id, Attention_CACHE_V, _cachev._value.get(), cache_bytes);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_Q, _wq._value.get(), weight_bytes);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_K, _wk._value.get(), weight_bytes);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_V, _wv._value.get(), weight_bytes);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo._value.get(), weight_bytes);
+        _executor->addBuffer(obj_id, Attention_CACHE_K, _cachek);
+        _executor->addBuffer(obj_id, Attention_CACHE_V, _cachev);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_Q, _wq);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_K, _wk);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_V, _wv);
+        _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo);
     }
 
     void forward(const RunParams& param);

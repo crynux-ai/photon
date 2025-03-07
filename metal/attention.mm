@@ -4,24 +4,17 @@
 
 
 void Attention<BackendType::METAL>::forward(const RunParams& param) {
-    int batch = param.batch;
     int totlen = param.start_pos + param.seq_len;
-
-    size_t input_bytes = param.batch * param.seq_len * param.dim * sizeof(float);
-    size_t weight_bytes = param.dim * param.dim * sizeof(float);
-    size_t rope_bytes = param.max_seq_len * param.num_complex * sizeof(float);
-    size_t score_bytes = param.batch * param.seq_len * param.max_seq_len * param.num_heads * sizeof(float);
-
     std::vector<int> input_shape = {param.batch, param.seq_len, param.dim};
     std::array<int, 3> grid_size = {param.batch, param.seq_len, param.dim};
     Tensor xq(input_shape);
     Tensor score({param.batch, param.seq_len, param.max_seq_len, param.num_heads});
     Tensor output(input_shape);
     Tensor result(input_shape);
-    _executor->addBuffer(obj_id, Attention_XQ, xq._value.get(), input_bytes);
-    _executor->addBuffer(obj_id, Attention_SCORE, score._value.get(), score_bytes);
-    _executor->addBuffer(obj_id, Attention_OUTPUT, output._value.get(), input_bytes);
-    _executor->addBuffer(obj_id, Attention_RESULT, result._value.get(), input_bytes);
+    _executor->addBuffer(obj_id, Attention_XQ, xq);
+    _executor->addBuffer(obj_id, Attention_SCORE, score);
+    _executor->addBuffer(obj_id, Attention_OUTPUT, output);
+    _executor->addBuffer(obj_id, Attention_RESULT, result);
 
 
     // wq(input), wk(input), wv(input)

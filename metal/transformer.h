@@ -67,8 +67,8 @@ public:
         _wo.build({ptr, emb_size});
 
         emb_size = _args.vocab_size * _args.dim * sizeof(float);
-        _executor->addBuffer(obj_id, Transformer_EMBEDDING_TABLE, _token_embeddings._value.get(), emb_size);
-        _executor->addBuffer(obj_id, Transformer_WEIGHT_O, _wo._value.get(), emb_size);
+        _executor->addBuffer(obj_id, Transformer_EMBEDDING_TABLE, _token_embeddings);
+        _executor->addBuffer(obj_id, Transformer_WEIGHT_O, _wo);
     }
 
     void forward(const RunParams& param);

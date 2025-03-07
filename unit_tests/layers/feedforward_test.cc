@@ -35,11 +35,10 @@ METAL_ARC_BEGIN
     Tensor y;
     y.build(loader.Read(tensor_bytes));
 
-    executor->addBuffer(ffn.obj_id, FFNSwiGLU_INPUT, x._value.get(), tensor_bytes - 16);
+    executor->addBuffer(ffn.obj_id, FFNSwiGLU_INPUT, x);
     ffn.forward(param);
-    Tensor z({3, 7, 256});
-    executor->bufferToTensor(ffn.obj_id, FFNSwiGLU_RESULT, &z);
-    EXPECT_EQ(z.eq(y, true), true);
+    auto z = executor->bufferToTensor(ffn.obj_id, FFNSwiGLU_RESULT, {3, 7, 256});
+    EXPECT_EQ(z->eq(y, true), true);
 METAL_ARC_END
 }
 

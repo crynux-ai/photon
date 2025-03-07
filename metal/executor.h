@@ -83,8 +83,8 @@ public:
         }
     }
 
-    void addBuffer(int obj_id, int idx, void* data_ptr, size_t data_size) {
-        auto tmp = [_device newBufferWithBytes:data_ptr length:data_size options:MTLResourceStorageModeShared];
+    void addBuffer(int obj_id, int idx, const Tensor& tensor) {
+        auto tmp = [_device newBufferWithBytes:tensor.data() length:tensor.bytes() options:MTLResourceStorageModeShared];
         if (_buffer.find(obj_id) == _buffer.end()) {
             _buffer.insert({obj_id, {{idx, tmp}}});
         } else {
@@ -101,13 +101,11 @@ public:
         }
     }
 
-    void bufferToTensor(int obj_id, int idx, Tensor* tensor) {
+    std::unique_ptr<Tensor> bufferToTensor(int obj_id, int idx, const std::vector<int>& shape) {
+        std::unique_ptr<Tensor> result = std::make_unique<Tensor>(shape);
         float* ptr = static_cast<float*>(_buffer[obj_id][idx].contents);
-        size_t cnt = 1;
-        for (int d : tensor->shape()) {
-            cnt *= d;
-        }
-        memcpy(tensor->_value.get(), ptr, cnt * sizeof(float));
+        memcpy(result->data(), ptr, result->bytes());
+        return std::move(result);
     }
 
     int nextLayerId() {

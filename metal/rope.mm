@@ -48,9 +48,6 @@ void apply_rotary_emb<BackendType::METAL>(
         id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
         [computeEncoder setComputePipelineState:_pipelineState];
 
-        size_t ropeByteSize = max_seq_len * num_complex * sizeof(float);
-        size_t xqByteSize = batch * seqlen * dim * sizeof(float);
-        size_t cacheByteSize = batch * max_seq_len * dim * sizeof(float);
         RunParams param = {
             .batch = batch,
             .seq_len = seqlen,
@@ -63,10 +60,10 @@ void apply_rotary_emb<BackendType::METAL>(
         };
 
         id<MTLBuffer> bufferParam = [_device newBufferWithBytes:&param length:sizeof(param) options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferCost = [_device newBufferWithBytes:cost._value.get() length:ropeByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferSint = [_device newBufferWithBytes:sint._value.get() length:ropeByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferXq = [_device newBufferWithBytes:xq->_value.get() length:xqByteSize options:MTLResourceStorageModeShared];
-        id<MTLBuffer> bufferCachek = [_device newBufferWithBytes:cachek->_value.get() length:cacheByteSize options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferCost = [_device newBufferWithBytes:cost.data() length:cost.bytes() options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferSint = [_device newBufferWithBytes:sint.data() length:sint.bytes() options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferXq = [_device newBufferWithBytes:xq->data() length:xq->bytes() options:MTLResourceStorageModeShared];
+        id<MTLBuffer> bufferCachek = [_device newBufferWithBytes:cachek->data() length:cachek->bytes() options:MTLResourceStorageModeShared];
 
         [computeEncoder setBuffer:bufferParam offset:0 atIndex:0];
         [computeEncoder setBuffer:bufferCost offset:0 atIndex:1];
@@ -82,14 +79,14 @@ void apply_rotary_emb<BackendType::METAL>(
         [commandBuffer waitUntilCompleted];
 
         float* ptrq = static_cast<float*>(bufferXq.contents);
-        memcpy(xq->_value.get(), ptrq, xqByteSize);
+        memcpy(xq->data(), ptrq, xq->bytes());
 
         float* ptrk = static_cast<float*>(bufferCachek.contents);
         int batch_cnt = max_seq_len * dim;
         int copy_byte_size = seqlen * dim * sizeof(float);
         int ptr = start_pos * dim;
         for (int b = 0; b < batch; b++, ptr += batch_cnt) {
-            memcpy(cachek->_value.get() + ptr, ptrk + ptr, copy_byte_size);
+            memcpy(cachek->data() + ptr, ptrk + ptr, copy_byte_size);
         }
     }
 }

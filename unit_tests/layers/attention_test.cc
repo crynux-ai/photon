@@ -31,8 +31,8 @@ METAL_ARC_BEGIN
     layer.build(loader.Read((dim * dim * 4 + 12) * 4));
 
     size_t rope_size = maxseqlen * head_dim / 2 * sizeof(float);
-    executor->addBuffer(layer.obj_id, Attention_ROPE_COST, rope_cost._value.get(), rope_size);
-    executor->addBuffer(layer.obj_id, Attention_ROPE_SINT, rope_sint._value.get(), rope_size);
+    executor->addBuffer(layer.obj_id, Attention_ROPE_COST, rope_cost);
+    executor->addBuffer(layer.obj_id, Attention_ROPE_SINT, rope_sint);
 
     Tensor x1, y1, x2, y2, x3, y3;
     x1.build(loader.Read(3*7*256*4 + 16));
@@ -56,31 +56,28 @@ METAL_ARC_BEGIN
     };
 
     size_t input_size = 3 * 7 * 256 * 4;
-    executor->addBuffer(layer.obj_id, Attention_INPUT, x1._value.get(), input_size);
+    executor->addBuffer(layer.obj_id, Attention_INPUT, x1);
     layer.forward(param);
-    Tensor p1({3, 7, 256});
-    executor->bufferToTensor(layer.obj_id, Attention_RESULT, &p1);
+    auto p1 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 7, 256});
 
     input_size = 3 * 3 * 256 * 4;
-    executor->addBuffer(layer.obj_id, Attention_INPUT, x2._value.get(), input_size);
+    executor->addBuffer(layer.obj_id, Attention_INPUT, x2);
     param.seq_len = 3;
     param.start_pos = 7;
     layer.forward(param);
-    Tensor p2({3, 3, 256});
-    executor->bufferToTensor(layer.obj_id, Attention_RESULT, &p2);
+    auto p2 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 3, 256});
 
     input_size = 3 * 2 * 256 * 4;
-    executor->addBuffer(layer.obj_id, Attention_INPUT, x3._value.get(), input_size);
+    executor->addBuffer(layer.obj_id, Attention_INPUT, x3);
     param.seq_len = 2;
     param.start_pos = 10;
     param.mask = false;
     layer.forward(param);
-    Tensor p3({3, 2, 256});
-    executor->bufferToTensor(layer.obj_id, Attention_RESULT, &p3);
+    auto p3 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 2, 256});
     
-    EXPECT_EQ(p1.eq(y1, true), true);
-    EXPECT_EQ(p2.eq(y2, true), true);
-    EXPECT_EQ(p3.eq(y3, true), true);
+    EXPECT_EQ(p1->eq(y1, true), true);
+    EXPECT_EQ(p2->eq(y2, true), true);
+    EXPECT_EQ(p3->eq(y3, true), true);
 METAL_ARC_END
 }
 

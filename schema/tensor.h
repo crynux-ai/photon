@@ -31,6 +31,15 @@ public:
         return _shape;
     }
 
+    size_t bytes() const {
+        return _cnt * sizeof(float);
+    }
+
+    float* data() const {
+        return _value.get();
+    }
+
+
     // TODO: use mmap
     void build(std::string_view data) {
         int dim;
@@ -110,9 +119,8 @@ public:
     }
 
 
-    std::unique_ptr<float[]> _value;
-
 protected:
+    std::unique_ptr<float[]> _value;
     std::vector<int> _shape;
     std::vector<int> _base;
     int _cnt;    

@@ -45,9 +45,9 @@ public:
 
         size_t weight_size = _dim * _actual_hidden_dim * sizeof(float);
 
-        _executor->addBuffer(obj_id, FFNSwiGLU_W1, _w1._value.get(), weight_size);
-        _executor->addBuffer(obj_id, FFNSwiGLU_W2, _w2._value.get(), weight_size);
-        _executor->addBuffer(obj_id, FFNSwiGLU_W3, _w3._value.get(), weight_size);
+        _executor->addBuffer(obj_id, FFNSwiGLU_W1, _w1);
+        _executor->addBuffer(obj_id, FFNSwiGLU_W2, _w2);
+        _executor->addBuffer(obj_id, FFNSwiGLU_W3, _w3);
     }
 
     void forward(const RunParams& param);
