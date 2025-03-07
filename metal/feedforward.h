@@ -33,24 +33,11 @@ public:
         return 3 * (_dim * _actual_hidden_dim * 4 + 12);
     }
 
-    void build(std::string_view content) {
-        auto ptr = content.data();
-        auto weight_read_size = _dim * _actual_hidden_dim * 4 + 12;
-
-        _w1.build({ptr, static_cast<size_t>(weight_read_size)});
-        ptr += weight_read_size;
-        _w2.build({ptr, static_cast<size_t>(weight_read_size)});
-        ptr += weight_read_size;
-        _w3.build({ptr, static_cast<size_t>(weight_read_size)});
-
-        size_t weight_size = _dim * _actual_hidden_dim * sizeof(float);
-
-        _executor->addBuffer(obj_id, FFNSwiGLU_W1, _w1);
-        _executor->addBuffer(obj_id, FFNSwiGLU_W2, _w2);
-        _executor->addBuffer(obj_id, FFNSwiGLU_W3, _w3);
-    }
+    void build(std::string_view content);
 
     void forward(const RunParams& param);
+
+    void alloc_shared_buffer(const RunParams& param);
 
 private:
     std::shared_ptr<Executor<BackendType::METAL>> _executor;

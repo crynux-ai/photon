@@ -49,29 +49,11 @@ public:
         return size;
     }
 
-    void build(std::string_view content) {
-        auto ptr = content.data();
-        auto attention_size = _attention[0]->size();
-        auto ffn_size = _ffn[0]->size();
-
-        for (int i = 0; i < _args.num_layers; i++) {
-            _attention[i]->build({ptr, attention_size});
-            ptr += attention_size;
-            _ffn[i]->build({ptr, ffn_size});
-            ptr += ffn_size;
-        }
-
-        size_t emb_size = _args.vocab_size * _args.dim * 4 + 12;
-        _token_embeddings.build({ptr, emb_size});
-        ptr += emb_size;
-        _wo.build({ptr, emb_size});
-
-        emb_size = _args.vocab_size * _args.dim * sizeof(float);
-        _executor->addBuffer(obj_id, Transformer_EMBEDDING_TABLE, _token_embeddings);
-        _executor->addBuffer(obj_id, Transformer_WEIGHT_O, _wo);
-    }
+    void build(std::string_view content);
 
     void forward(const RunParams& param);
+
+    void alloc_shared_buffer(const RunParams& param);
 
 private:
     std::shared_ptr<Executor<BackendType::METAL>> _executor;

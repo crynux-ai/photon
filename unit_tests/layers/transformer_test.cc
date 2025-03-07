@@ -81,6 +81,7 @@ METAL_ARC_BEGIN
         int seqlen = inputs[i]->shape()[1];
         params.seq_len = seqlen;
         executor->addBuffer(layer.obj_id, Transformer_INPUT, *inputs[i]);
+        layer.alloc_shared_buffer(params);
 
         auto start = high_resolution_clock::now();
         for (int j=0; j < 10; j++)

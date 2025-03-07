@@ -6,22 +6,6 @@
 #include "schema/tensor.h"
 #include <cmath>
 
-enum AttentionTensor {
-    Attention_INPUT = 0,
-    Attention_CACHE_K = 1,
-    Attention_CACHE_V = 2,
-    Attention_WEIGHT_Q = 3,
-    Attention_WEIGHT_K = 4,
-    Attention_WEIGHT_V = 5,
-    Attention_WEIGHT_O = 6,
-    Attention_XQ = 7,
-    Attention_ROPE_COST = 10,
-    Attention_ROPE_SINT = 11,
-    Attention_SCORE = 13,
-    Attention_OUTPUT = 14,
-    Attention_RESULT = 15,
-    Attention_RESIDUAL = 17,
-};
 
 template <BackendType backend>
 class Attention {

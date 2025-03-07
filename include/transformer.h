@@ -5,17 +5,6 @@
 #include "schema/tensor.h"
 #include <cmath>
 
-enum TransformerTensor {
-    Transformer_INPUT = 0,
-    Transformer_EMBEDDING_TABLE = 1,
-    Transformer_WEIGHT_O = 2,
-    Transformer_INPUT_EMBEDDING = 3,
-    Transformer_INPUT_PARAMS = 4,
-    Transformer_OUTPUT = 5,
-    Transformer_RESULT = 6,
-    Transformer_INPUT_NORMS = 7,
-};
-
 
 template <BackendType backend>
 class Transformer {

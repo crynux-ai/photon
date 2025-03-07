@@ -31,8 +31,8 @@ METAL_ARC_BEGIN
     layer.build(loader.Read((dim * dim * 4 + 12) * 4));
 
     size_t rope_size = maxseqlen * head_dim / 2 * sizeof(float);
-    executor->addBuffer(layer.obj_id, Attention_ROPE_COST, rope_cost);
-    executor->addBuffer(layer.obj_id, Attention_ROPE_SINT, rope_sint);
+    executor->addBuffer(layer.obj_id, Rope_COST, rope_cost);
+    executor->addBuffer(layer.obj_id, Rope_SINT, rope_sint);
 
     Tensor x1, y1, x2, y2, x3, y3;
     x1.build(loader.Read(3*7*256*4 + 16));
@@ -57,6 +57,7 @@ METAL_ARC_BEGIN
 
     size_t input_size = 3 * 7 * 256 * 4;
     executor->addBuffer(layer.obj_id, Attention_INPUT, x1);
+    layer.alloc_shared_buffer(param);
     layer.forward(param);
     auto p1 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 7, 256});
 

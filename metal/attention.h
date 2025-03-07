@@ -33,34 +33,11 @@ public:
         return 4 * (_dim * _dim * 4 + 12);
     }
 
-    void build(std::string_view content) {
-        auto ptr = content.data();
-        size_t weight_bytes = _dim * _dim * sizeof(float) + 12;
-        size_t cache_bytes = _executor->batch * _max_seq_len * _dim * sizeof(float);
-
-        _wq.build({ptr, static_cast<size_t>(weight_bytes)});
-        ptr += weight_bytes;
-        _wk.build({ptr, static_cast<size_t>(weight_bytes)});
-        ptr += weight_bytes;
-        _wv.build({ptr, static_cast<size_t>(weight_bytes)});
-        ptr += weight_bytes;
-        _wo.build({ptr, static_cast<size_t>(weight_bytes)});
-
-        assert(_executor->batch > 0);
-        _cachek = Tensor({_executor->batch, _max_seq_len, _dim});
-        _cachev = Tensor({_executor->batch, _max_seq_len, _dim});
-
-        
-        weight_bytes -= 12;
-        _executor->addBuffer(obj_id, Attention_CACHE_K, _cachek);
-        _executor->addBuffer(obj_id, Attention_CACHE_V, _cachev);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_Q, _wq);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_K, _wk);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_V, _wv);
-        _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo);
-    }
+    void build(std::string_view content);
 
     void forward(const RunParams& param);
+
+    void alloc_shared_buffer(const RunParams& param);
 
 private:
     Tensor _wq;
