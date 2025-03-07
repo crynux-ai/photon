@@ -84,8 +84,10 @@ METAL_ARC_BEGIN
         layer.alloc_shared_buffer(params);
 
         auto start = high_resolution_clock::now();
-        for (int j=0; j < 10; j++)
-        layer.forward(params);
+        for (int j=0; j < 1000; j++) {
+            layer.forward(params);
+            executor->waitUntilCompleted();
+        }
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << "Time: " << duration.count() << " microseconds" << std::endl;

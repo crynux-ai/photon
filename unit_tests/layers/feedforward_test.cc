@@ -38,6 +38,7 @@ METAL_ARC_BEGIN
     executor->addBuffer(ffn.obj_id, FFNSwiGLU_INPUT, x);
     ffn.alloc_shared_buffer(param);
     ffn.forward(param);
+    executor->waitUntilCompleted();
     auto z = executor->bufferToTensor(ffn.obj_id, FFNSwiGLU_RESULT, {3, 7, 256});
     EXPECT_EQ(z->eq(y, true), true);
 METAL_ARC_END

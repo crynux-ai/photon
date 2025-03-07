@@ -66,23 +66,27 @@ public:
     }
 
     void forward(int obj_id, int func, const RunParams& param, std::vector<int> command_args, std::array<int, 3> grid_size) {
-        @autoreleasepool {
-            _command_buffer = [_command_queue commandBuffer];
-            id<MTLComputeCommandEncoder> encoder = [_command_buffer computeCommandEncoder];
-            [encoder setComputePipelineState:_states[func]];
+        _command_buffer.push_back([_command_queue commandBuffer]);
+        id<MTLComputeCommandEncoder> encoder = [_command_buffer.back() computeCommandEncoder];
+        [encoder setComputePipelineState:_states[func]];
 
-            [encoder setBytes:&param length:sizeof(param) atIndex:0];
-            for (int i = 0; i < command_args.size(); i++) {
-                [encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i+1];
-            }
-
-            MTLSize gridSize = MTLSizeMake(grid_size[0], grid_size[1], grid_size[2]);
-            MTLSize threadgroupSize = MTLSizeMake(1, 1, 1);
-            [encoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
-            [encoder endEncoding];
-            [_command_buffer commit];
-            [_command_buffer waitUntilCompleted];
+        [encoder setBytes:&param length:sizeof(param) atIndex:0];
+        for (int i = 0; i < command_args.size(); i++) {
+            [encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i+1];
         }
+
+        MTLSize gridSize = MTLSizeMake(grid_size[0], grid_size[1], grid_size[2]);
+        MTLSize threadgroupSize = MTLSizeMake(1, 1, 1);
+        [encoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+        [encoder endEncoding];
+        [_command_buffer.back() commit];
+    }
+
+    void waitUntilCompleted() {
+        for (const auto& item : _command_buffer) {
+            [item waitUntilCompleted];
+        }
+        _command_buffer.clear();
     }
 
     void addBuffer(int obj_id, int idx, const id<MTLBuffer>& buf) {
@@ -140,7 +144,7 @@ public:
     id<MTLDevice> _device;
     id<MTLLibrary> _library;
     id<MTLCommandQueue> _command_queue;
-    id<MTLCommandBuffer> _command_buffer;
+    std::vector<id<MTLCommandBuffer>> _command_buffer;
 
     std::map<int, std::map<int, id<MTLBuffer>>> _buffer;
     std::vector<std::unique_ptr<Tensor>> _shared_alloc;

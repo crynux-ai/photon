@@ -59,6 +59,7 @@ METAL_ARC_BEGIN
     executor->addBuffer(layer.obj_id, Attention_INPUT, x1);
     layer.alloc_shared_buffer(param);
     layer.forward(param);
+    executor->waitUntilCompleted();
     auto p1 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 7, 256});
 
     input_size = 3 * 3 * 256 * 4;
@@ -66,6 +67,7 @@ METAL_ARC_BEGIN
     param.seq_len = 3;
     param.start_pos = 7;
     layer.forward(param);
+    executor->waitUntilCompleted();
     auto p2 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 3, 256});
 
     input_size = 3 * 2 * 256 * 4;
@@ -74,6 +76,7 @@ METAL_ARC_BEGIN
     param.start_pos = 10;
     param.mask = false;
     layer.forward(param);
+    executor->waitUntilCompleted();
     auto p3 = executor->bufferToTensor(layer.obj_id, Attention_RESULT, {3, 2, 256});
     
     EXPECT_EQ(p1->eq(y1, true), true);
