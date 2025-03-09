@@ -24,12 +24,7 @@ void Transformer<BackendType::METAL>::forward(const RunParams& param) {
                 Transformer_INPUT_NORMS,
             },
             {param.batch, param.seq_len, param.dim});
-
-        _attention[l]->alloc_shared_buffer(param);
-        _executor->addBuffer(_attention[l]->obj_id, Attention_INPUT, obj_id, Transformer_INPUT_NORMS);
-        _executor->addBuffer(_attention[l]->obj_id, Attention_RESIDUAL, obj_id, Transformer_INPUT_EMBEDDING);
         _attention[l]->forward(layer_param);
-        _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, _attention[l]->obj_id, Attention_RESULT);
 
         // FFN
         _executor->forward(obj_id, 10, param,
@@ -38,11 +33,7 @@ void Transformer<BackendType::METAL>::forward(const RunParams& param) {
                 Transformer_INPUT_NORMS,
             },
             {param.batch, param.seq_len, param.dim});
-        _ffn[l]->alloc_shared_buffer(param);
-        _executor->addBuffer(_ffn[l]->obj_id, FFNSwiGLU_INPUT, obj_id, Transformer_INPUT_NORMS);
-        _executor->addBuffer(_ffn[l]->obj_id, FFNSwiGLU_RESIDUAL, obj_id, Transformer_INPUT_EMBEDDING);
         _ffn[l]->forward(layer_param);
-        _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, _ffn[l]->obj_id, FFNSwiGLU_RESULT);
     }
     _executor->forward(obj_id, 10, param,
             {
@@ -88,5 +79,16 @@ void Transformer<BackendType::METAL>::alloc_shared_buffer(const RunParams& param
     _executor->addBuffer(obj_id, Transformer_INPUT_NORMS, input_shape);
     _executor->addBuffer(obj_id, Transformer_OUTPUT, obj_id, Transformer_INPUT_NORMS);
     _executor->addBuffer(obj_id, Transformer_RESULT, {param.batch, param.seq_len, param.vocab_size});
+    RunParams x = param;
+    for (int l = 0; l < _args.num_layers; l++) {
+        _attention[l]->alloc_shared_buffer(x);
+        _ffn[l]->alloc_shared_buffer(x);
+        _executor->addBuffer(_attention[l]->obj_id, Attention_INPUT, obj_id, Transformer_INPUT_NORMS);
+        _executor->addBuffer(_attention[l]->obj_id, Attention_RESIDUAL, obj_id, Transformer_INPUT_EMBEDDING);
+        _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, _attention[l]->obj_id, Attention_RESULT);
+        _executor->addBuffer(_ffn[l]->obj_id, FFNSwiGLU_INPUT, obj_id, Transformer_INPUT_NORMS);
+        _executor->addBuffer(_ffn[l]->obj_id, FFNSwiGLU_RESIDUAL, obj_id, Transformer_INPUT_EMBEDDING);
+        _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, _ffn[l]->obj_id, FFNSwiGLU_RESULT);
+    }
 }
 
