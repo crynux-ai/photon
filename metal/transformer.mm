@@ -82,11 +82,11 @@ void Transformer<BackendType::METAL>::build(std::string_view content) {
 
 void Transformer<BackendType::METAL>::alloc_shared_buffer(const RunParams& param) {
     PROFILE_BEGIN(obj_id, "Transformer/alloc")
-    std::vector<int> input_shape = {param.batch, param.seq_len, param.dim};
-    _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, input_shape);
-    _executor->addBuffer(obj_id, Transformer_INPUT_NORMS, input_shape);
+    size_t input_bytes = param.batch * param.seq_len * param.dim * sizeof(float);
+    _executor->addBuffer(obj_id, Transformer_INPUT_EMBEDDING, input_bytes);
+    _executor->addBuffer(obj_id, Transformer_INPUT_NORMS, input_bytes);
     _executor->addBuffer(obj_id, Transformer_OUTPUT, obj_id, Transformer_INPUT_NORMS);
-    _executor->addBuffer(obj_id, Transformer_RESULT, {param.batch, param.seq_len, param.vocab_size});
+    _executor->addBuffer(obj_id, Transformer_RESULT, param.batch * param.seq_len * param.vocab_size * sizeof(float));
     RunParams x = param;
     for (int l = 0; l < _args.num_layers; l++) {
         _attention[l]->alloc_shared_buffer(x);

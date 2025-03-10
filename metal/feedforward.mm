@@ -49,11 +49,11 @@ void FFNSwiGLU<BackendType::METAL>::build(std::string_view content) {
 
 void FFNSwiGLU<BackendType::METAL>::alloc_shared_buffer(const RunParams& param) {
     PROFILE_BEGIN(obj_id, "FFNSwiGLU/alloc")
-    std::vector<int> input_shape = {param.batch, param.seq_len, param.dim};
-    _executor->addBuffer(obj_id, FFNSwiGLU_RESULT, input_shape);
+    size_t base_bytes = param.batch * param.seq_len * sizeof(float);
+    _executor->addBuffer(obj_id, FFNSwiGLU_RESULT, base_bytes * param.dim);
     if (!param.residual) {
         _executor->addBuffer(obj_id, FFNSwiGLU_RESIDUAL, obj_id, FFNSwiGLU_INPUT);  // dummy input
     }
-    _executor->addBuffer(obj_id, FFNSwiGLU_HIDDEN_OUTPUT, {param.batch, param.seq_len, param.actual_hidden_dim});
+    _executor->addBuffer(obj_id, FFNSwiGLU_HIDDEN_OUTPUT, base_bytes * param.actual_hidden_dim);
     PROFILE_END(obj_id, "FFNSwiGLU/alloc")
 }

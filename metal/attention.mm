@@ -96,12 +96,13 @@ void Attention<BackendType::METAL>::build(std::string_view content) {
 void Attention<BackendType::METAL>::alloc_shared_buffer(const RunParams& param) {
     PROFILE_BEGIN(obj_id, "Attention/alloc")
     // Assume seq_len in prefilling is more than seq_len in decoding.
-    std::vector<int> input_shape = {param.batch, param.seq_len, param.dim};
-    _executor->addBuffer(obj_id, Attention_XQ, input_shape);
-    _executor->addBuffer(obj_id, Attention_SCORE, {param.batch, param.seq_len, param.max_seq_len, param.num_heads});
-    _executor->addBuffer(obj_id, Attention_OUTPUT, input_shape);
-    _executor->addBuffer(obj_id, Attention_RESULT, input_shape);
-    _executor->addBuffer(obj_id, Rope_COST);
-    _executor->addBuffer(obj_id, Rope_SINT);
+    size_t input_bytes = param.batch * param.seq_len * param.dim * sizeof(float);
+    size_t score_bytes = param.batch * param.seq_len * param.max_seq_len * param.num_heads * sizeof(float);
+    _executor->addBuffer(obj_id, Attention_XQ, input_bytes);
+    _executor->addBuffer(obj_id, Attention_SCORE, score_bytes);
+    _executor->addBuffer(obj_id, Attention_OUTPUT, input_bytes);
+    _executor->addBuffer(obj_id, Attention_RESULT, input_bytes);
+    _executor->useSharedBuffer(obj_id, Rope_COST);
+    _executor->useSharedBuffer(obj_id, Rope_SINT);
     PROFILE_END(obj_id, "Attention/alloc")
 }

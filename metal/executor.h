@@ -122,7 +122,8 @@ public:
 
     void addBuffer(int obj_id, int idx, const Tensor& tensor) {
         // Create buffer from tensor and add it
-        auto tmp = [_device newBufferWithBytes:tensor.data() length:tensor.bytes() options:MTLResourceStorageModeShared];
+        auto tmp = [_device newBufferWithBytesNoCopy:tensor.data() length:tensor.bytes()
+            options:MTLResourceStorageModeShared deallocator:nil];
         addBuffer(obj_id, idx, tmp);
     }
 
@@ -131,18 +132,18 @@ public:
         addBuffer(obj_id, idx, _buffer[src_obj_id][src_tensor_id]);
     }
 
-    void addBuffer(int obj_id, int idx, const std::vector<int>& shape) {
+    void addBuffer(int obj_id, int idx, size_t bytes) {
         // Reuse existing tensor, otherwise create new one.
         // Assume tensor shape of the same idx will decrease during decoding.
         if (_shared_alloc[idx]) {
-            addBuffer(obj_id, idx, *_shared_alloc[idx]);
+            addBuffer(obj_id, idx, _shared_alloc[idx]);
         } else {
-            _shared_alloc[idx] = std::make_unique<Tensor>(shape);
-            addBuffer(obj_id, idx, *_shared_alloc[idx]);
+            _shared_alloc[idx] = [_device newBufferWithLength:bytes options:MTLResourceStorageModeShared];
+            addBuffer(obj_id, idx, _shared_alloc[idx]);
         }
     }
 
-    void addBuffer(int obj_id, int idx) {
+    void useSharedBuffer(int obj_id, int idx) {
         // Reuse existing buffer
         addBuffer(obj_id, idx, _shared_buffer[idx]);
     }
@@ -166,7 +167,7 @@ public:
     std::vector<id<MTLCommandBuffer>> _command_buffer;
 
     std::map<int, std::map<int, id<MTLBuffer>>> _buffer;
-    std::vector<std::unique_ptr<Tensor>> _shared_alloc;
+    std::vector<id<MTLBuffer>> _shared_alloc;
     std::vector<id<MTLBuffer>> _shared_buffer;
 
     std::map<int, std::string> _func_names;
