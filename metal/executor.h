@@ -3,6 +3,7 @@
 #include "include/backend.h"
 #include "include/executor.h"
 #include "include/params.h"
+#include "include/profiler.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
 
@@ -65,7 +66,12 @@ public:
         }
     }
 
-    void forward(int obj_id, int func, const RunParams& param, std::vector<int> command_args, std::array<int, 3> grid_size) {
+    void forward(int obj_id, int func, const RunParams& param,
+            const std::vector<int>& command_args, const std::array<int, 3>& grid_size
+#ifdef ENABLE_PROFILE
+            , const std::string& tag
+#endif
+    ) {
         _command_buffer.push_back([_command_queue commandBuffer]);
         id<MTLComputeCommandEncoder> encoder = [_command_buffer.back() computeCommandEncoder];
         [encoder setComputePipelineState:_states[func]];
@@ -79,6 +85,14 @@ public:
         MTLSize threadgroupSize = MTLSizeMake(1, 1, 1);
         [encoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
         [encoder endEncoding];
+
+#ifdef ENABLE_PROFILE
+        std::string current_tag = tag;
+        [_command_buffer.back() addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
+            Profiler::add(obj_id, current_tag + ":kernel", int64_t(buffer.kernelStartTime * 1e9), int64_t(buffer.kernelEndTime * 1e9));
+            Profiler::add(obj_id, current_tag + ":gpu", int64_t(buffer.GPUStartTime * 1e9), int64_t(buffer.GPUEndTime * 1e9));
+        }];
+#endif
         [_command_buffer.back() commit];
     }
 

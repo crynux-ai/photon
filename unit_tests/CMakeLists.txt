@@ -1,4 +1,4 @@
-# cmake -DPLATFORM=METAL -DCMAKE_BUILD_TYPE=Debug .. && make
+# cmake -DPLATFORM=METAL -DCMAKE_BUILD_TYPE=Debug -DENABLE_PROFILE=ON.. && make
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
@@ -40,7 +40,7 @@ endif()
 
     
 foreach(test IN LISTS TESTS)
-    target_compile_definitions(${test} PUBLIC ${PLATFORM_MACRO})
+    target_compile_definitions(${test} PUBLIC ${COMPILE_MACRO})
     target_link_libraries(${test} PRIVATE ${LINKS})
     add_test(NAME ${test} COMMAND ${test} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endforeach()

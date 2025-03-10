@@ -1,3 +1,4 @@
+#include "include/profiler.h"
 #include "metal/attention.h"
 
 #include <cassert>
@@ -18,7 +19,8 @@ void Attention<BackendType::METAL>::forward(const RunParams& param) {
             Attention_CACHE_K,
             Attention_CACHE_V,
         },
-        grid_size);
+        grid_size
+        PROFILE_TAG("Attention/WQKV"));
 
     // Rope apply_rotary_emb
     _executor->forward(obj_id, 4, param,
@@ -28,7 +30,8 @@ void Attention<BackendType::METAL>::forward(const RunParams& param) {
             Attention_XQ,
             Attention_CACHE_K,
         },
-        {param.batch, param.seq_len, param.dim / 2});
+        {param.batch, param.seq_len, param.dim / 2}
+        PROFILE_TAG("Attention/Rope_apply_emb"));
 
 
     // softmax(QK^T/scale)) (not averaged)
@@ -39,7 +42,8 @@ void Attention<BackendType::METAL>::forward(const RunParams& param) {
             Attention_CACHE_V,
             Attention_SCORE,
         },
-        {param.batch, param.seq_len, totlen * param.num_heads});
+        {param.batch, param.seq_len, totlen * param.num_heads}
+        PROFILE_TAG("Attention/Score"));
 
     // score @ cachev
     _executor->forward(obj_id, 6, param,
@@ -48,7 +52,8 @@ void Attention<BackendType::METAL>::forward(const RunParams& param) {
             Attention_CACHE_V,
             Attention_OUTPUT,
         },
-        grid_size);
+        grid_size
+        PROFILE_TAG("Attention/Score@V"));
 
     // Wo @ output
     if (!param.residual) {
@@ -61,10 +66,12 @@ void Attention<BackendType::METAL>::forward(const RunParams& param) {
             Attention_RESIDUAL,
             Attention_RESULT,
         },
-        grid_size);
+        grid_size
+        PROFILE_TAG("Attention/Output"));
 }
 
 void Attention<BackendType::METAL>::build(std::string_view content) {
+    PROFILE_BEGIN(obj_id, "Attention/build")
     auto ptr = content.data();
     size_t weight_bytes = _dim * _dim * sizeof(float) + 12;
     _wq.build({ptr, static_cast<size_t>(weight_bytes)});
@@ -83,9 +90,11 @@ void Attention<BackendType::METAL>::build(std::string_view content) {
     _executor->addBuffer(obj_id, Attention_WEIGHT_K, _wk);
     _executor->addBuffer(obj_id, Attention_WEIGHT_V, _wv);
     _executor->addBuffer(obj_id, Attention_WEIGHT_O, _wo);
+    PROFILE_END(obj_id, "Attention/build")
 }
 
 void Attention<BackendType::METAL>::alloc_shared_buffer(const RunParams& param) {
+    PROFILE_BEGIN(obj_id, "Attention/alloc")
     // Assume seq_len in prefilling is more than seq_len in decoding.
     std::vector<int> input_shape = {param.batch, param.seq_len, param.dim};
     _executor->addBuffer(obj_id, Attention_XQ, input_shape);
@@ -94,4 +103,5 @@ void Attention<BackendType::METAL>::alloc_shared_buffer(const RunParams& param) 
     _executor->addBuffer(obj_id, Attention_RESULT, input_shape);
     _executor->addBuffer(obj_id, Rope_COST);
     _executor->addBuffer(obj_id, Rope_SINT);
+    PROFILE_END(obj_id, "Attention/alloc")
 }

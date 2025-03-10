@@ -1,5 +1,6 @@
 #include "include/backend.h"
 #include "include/executor.h"
+#include "include/profiler.h"
 #include "include/transformer.h"
 #include "schema/loader.h"
 #include "schema/tensor.h"
@@ -84,13 +85,15 @@ METAL_ARC_BEGIN
         layer.alloc_shared_buffer(params);
 
         auto start = high_resolution_clock::now();
-        for (int j=0; j < 1000; j++) {
+        int repeat_cnt = 1;
+        for (int j=0; j < repeat_cnt; j++) {
             layer.forward(params);
             executor->waitUntilCompleted();
         }
         auto stop = high_resolution_clock::now();
-        auto duration = duration_cast<microseconds>(stop - start);
-        std::cout << "Time: " << duration.count() << " microseconds" << std::endl;
+        auto duration = duration_cast<nanoseconds>(stop - start);
+        std::cout << "Time: " << duration.count() / repeat_cnt << " ns" << std::endl;
+        PROFILE_PRINT
 
         params.start_pos += params.seq_len;
         auto result = executor->bufferToTensor(layer.obj_id, Transformer_RESULT, {batch, seqlen, vocab_size});

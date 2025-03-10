@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.11)
 
 set(PLATFORM "CPU" CACHE STRING "Select an option: CPU, METAL, CUDA")
 set_property(CACHE PLATFORM PROPERTY STRINGS "CPU;METAL;CUDA")
+set(ENABLE_PROFILE "OFF" CACHE STRING "Select an option: ON, OFF")
+set_property(CACHE ENABLE_PROFILE PROPERTY STRINGS "ON;OFF")
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,8 +18,22 @@ file(
     "shared/*.h" "shared/*.cc"
 )
 
+
+set(COMPILE_MACRO)
 if(PLATFORM STREQUAL "METAL")
-    set(PLATFORM_MACRO -DPHOTON_METAL)
+    list(APPEND COMPILE_MACRO -DPHOTON_METAL)
+else()
+    list(APPEND COMPILE_MACRO -DPHOTON_CPU)
+endif()
+
+if (ENABLE_PROFILE STREQUAL "ON")
+    list(APPEND COMPILE_MACRO -DENABLE_PROFILE)
+endif()
+
+
+
+
+if(PLATFORM STREQUAL "METAL")
     project("photon" LANGUAGES C CXX OBJCXX)
 
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
@@ -56,7 +73,7 @@ if(PLATFORM STREQUAL "METAL")
     add_library(photon_metallib STATIC ${METAL_SRC})
     target_sources(photon_metallib PRIVATE ${METAL_SRCS})
     target_include_directories(photon_metallib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_options(photon_metallib PRIVATE ${PLATFORM_MACRO})
+    target_compile_options(photon_metallib PRIVATE ${COMPILE_MACRO})
     target_link_libraries(photon_metallib
         ${METAL_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
@@ -66,7 +83,7 @@ if(PLATFORM STREQUAL "METAL")
     # Build photon
     add_library(photon STATIC ${SRCS})
     target_include_directories(photon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_options(photon PRIVATE ${PLATFORM_MACRO})
+    target_compile_options(photon PRIVATE ${COMPILE_MACRO})
     target_link_libraries(photon photon_metallib)
     add_custom_command(
         TARGET photon POST_BUILD
@@ -87,11 +104,10 @@ if(PLATFORM STREQUAL "METAL")
 
     add_dependencies(photon metallib)
 else()
-    set(PLATFORM_MACRO -DPHOTON_CPU)
     project("photon" CXX)
     file(GLOB CPU_SRCS "cpu/*.cc" "cpu/*.h")
     add_library(photon STATIC ${SRCS} ${CPU_SRCS})
-    target_compile_options(photon PRIVATE ${PLATFORM_MACRO})
+    target_compile_options(photon PRIVATE ${COMPILE_MACRO})
 endif()
 
 target_include_directories(photon PUBLIC . )
