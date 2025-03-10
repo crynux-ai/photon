@@ -56,7 +56,16 @@ void Profiler::print() {
         }
     }
 
-    for (auto item : duration) {
+    std::vector<std::pair<std::string, uint64_t>> sorted_duration;
+    for (const auto& pair : duration) {
+        sorted_duration.push_back(pair);
+    }
+    std::sort(sorted_duration.begin(), sorted_duration.end(),
+        [](const std::pair<std::string, uint64_t>& a, const std::pair<std::string, uint64_t>& b) {
+            return a.second > b.second;
+        });
+
+    for (auto item : sorted_duration) {
         int cnt = item.first.length() / 8;
         cnt = cnt < 5 ? 5 - cnt : 1;
         std::string tab;

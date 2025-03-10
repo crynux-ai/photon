@@ -89,8 +89,13 @@ public:
 #ifdef ENABLE_PROFILE
         std::string current_tag = tag;
         [_command_buffer.back() addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-            Profiler::add(obj_id, current_tag + ":kernel", int64_t(buffer.kernelStartTime * 1e9), int64_t(buffer.kernelEndTime * 1e9));
-            Profiler::add(obj_id, current_tag + ":gpu", int64_t(buffer.GPUStartTime * 1e9), int64_t(buffer.GPUEndTime * 1e9));
+            int64_t kernelStart = int64_t(buffer.kernelStartTime * 1e9);
+            int64_t kernelEnd = int64_t(buffer.kernelEndTime * 1e9);
+            int64_t gpuStart = int64_t(buffer.GPUStartTime * 1e9);
+            int64_t gpuEnd = int64_t(buffer.GPUEndTime * 1e9);
+            Profiler::add(obj_id, current_tag + ":kernel", kernelStart, kernelEnd);
+            Profiler::add(obj_id, current_tag + ":gpu", gpuStart, gpuEnd);
+            Profiler::add(obj_id, current_tag + ":offset", kernelStart, gpuStart);
         }];
 #endif
         [_command_buffer.back() commit];
