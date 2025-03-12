@@ -39,31 +39,31 @@ public:
     ~Executor() {}
 
     void build() {
-        @autoreleasepool {
-            NSError* error;
-            _device = MTLCreateSystemDefaultDevice();
-            if (!_device) {
-                throw std::runtime_error("Metal is not supported");
-            }
-            NSString *libPath = [[NSBundle mainBundle] pathForResource:@"photon" ofType:@"metallib"];
-            _library = [_device newLibraryWithFile:libPath error:&error];
-            if (!_library) {
-                throw std::runtime_error("Fail to load library");
-            }
-
-            for (const auto& pair : _func_names) {
-                NSString* func_name = [[NSString alloc] initWithUTF8String:pair.second.c_str()];
-                _funcs[pair.first] = [_library newFunctionWithName: func_name];
-                if (!_funcs[pair.first]) {
-                    throw std::runtime_error("Method not found in the library");    
-                }
-                _states[pair.first] = [_device newComputePipelineStateWithFunction:_funcs[pair.first] error:&error];
-                if (!_states[pair.first]) {
-                    throw std::runtime_error("Fail to create pipeline");
-                }
-            }
-            _command_queue = [_device newCommandQueue];
+        NSError* error;
+        _device = MTLCreateSystemDefaultDevice();
+        if (!_device) {
+            throw std::runtime_error("Metal is not supported");
         }
+        NSString *libPath = [[NSBundle mainBundle] pathForResource:@"photon" ofType:@"metallib"];
+        _library = [_device newLibraryWithFile:libPath error:&error];
+        if (!_library) {
+            throw std::runtime_error("Fail to load library");
+        }
+
+        for (const auto& pair : _func_names) {
+            NSString* func_name = [[NSString alloc] initWithUTF8String:pair.second.c_str()];
+            _funcs[pair.first] = [_library newFunctionWithName: func_name];
+            if (!_funcs[pair.first]) {
+                throw std::runtime_error("Method not found in the library");    
+            }
+            _states[pair.first] = [_device newComputePipelineStateWithFunction:_funcs[pair.first] error:&error];
+            if (!_states[pair.first]) {
+                throw std::runtime_error("Fail to create pipeline");
+            }
+        }
+        _command_queue = [_device newCommandQueue];
+        _command_buffer = nullptr;
+        _command_encoder = nullptr;
     }
 
     void forward(int obj_id, int func, const RunParams& param,
@@ -71,41 +71,28 @@ public:
 #ifdef ENABLE_PROFILE
             , const std::string& tag
 #endif
-    ) {
-        _command_buffer.push_back([_command_queue commandBuffer]);
-        id<MTLComputeCommandEncoder> encoder = [_command_buffer.back() computeCommandEncoder];
-        [encoder setComputePipelineState:_states[func]];
-
-        [encoder setBytes:&param length:sizeof(param) atIndex:0];
+    ) { 
+        if (!_command_buffer) {
+            _command_buffer = [_command_queue commandBuffer];
+            _command_encoder = [_command_buffer computeCommandEncoder];
+        }
+        [_command_encoder setComputePipelineState:_states[func]];
+        [_command_encoder setBytes:&param length:sizeof(param) atIndex:0];
         for (int i = 0; i < command_args.size(); i++) {
-            [encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i+1];
+            [_command_encoder setBuffer:_buffer[obj_id][command_args[i]] offset:0 atIndex:i+1];
         }
 
         MTLSize gridSize = MTLSizeMake(grid_size[0], grid_size[1], grid_size[2]);
         MTLSize threadgroupSize = MTLSizeMake(1, 1, 1);
-        [encoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
-        [encoder endEncoding];
-
-#ifdef ENABLE_PROFILE
-        std::string current_tag = tag;
-        [_command_buffer.back() addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-            int64_t kernelStart = int64_t(buffer.kernelStartTime * 1e9);
-            int64_t kernelEnd = int64_t(buffer.kernelEndTime * 1e9);
-            int64_t gpuStart = int64_t(buffer.GPUStartTime * 1e9);
-            int64_t gpuEnd = int64_t(buffer.GPUEndTime * 1e9);
-            Profiler::add(obj_id, current_tag + ":kernel", kernelStart, kernelEnd);
-            Profiler::add(obj_id, current_tag + ":gpu", gpuStart, gpuEnd);
-            Profiler::add(obj_id, current_tag + ":offset", kernelStart, gpuStart);
-        }];
-#endif
-        [_command_buffer.back() commit];
+        [_command_encoder dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
     }
 
     void waitUntilCompleted() {
-        for (const auto& item : _command_buffer) {
-            [item waitUntilCompleted];
-        }
-        _command_buffer.clear();
+        [_command_encoder endEncoding];
+        [_command_buffer commit];
+        [_command_buffer waitUntilCompleted];
+        _command_buffer = nullptr;
+        _command_encoder = nullptr;
     }
 
     void addBuffer(int obj_id, int idx, const id<MTLBuffer>& buf) {
@@ -164,7 +151,8 @@ public:
     id<MTLDevice> _device;
     id<MTLLibrary> _library;
     id<MTLCommandQueue> _command_queue;
-    std::vector<id<MTLCommandBuffer>> _command_buffer;
+    id<MTLComputeCommandEncoder> _command_encoder;
+    id<MTLCommandBuffer> _command_buffer;
 
     std::map<int, std::map<int, id<MTLBuffer>>> _buffer;
     std::vector<id<MTLBuffer>> _shared_alloc;
